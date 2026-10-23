@@ -143,8 +143,8 @@
 
   // MARK: - Focus
 
-  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
+  var Z = {TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
+  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
@@ -161,6 +161,8 @@
     setClass($('quotes'), 'hide', st.zone === Z.TOP && st.top >= 3);
     list = $('cards').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.CARDS && st.card === i);
+    list = $('home-widgets').children;
+    for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.WIDGETS && st.widget === i);
     list = $('tiles').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.SHELF && st.shelf === i);
     list = document.querySelectorAll('#drawer .key');
@@ -174,6 +176,7 @@
     focusRows($('langpick'), st.lang, st.zone === Z.LANG);
     if (langHint) langHint.textContent = (st.lang + 1) + ' / ' + languageChoices().length + '  ·  ' + tr('OK picks, Back cancels.');
     setClass(body, 'drawer-open', st.zone === Z.DRAWER);
+    syncHomeWidgets();
   }
 
   function focusRows(sheet, index, on) {
@@ -544,6 +547,35 @@
     ].map(function (row) { row.readOnly = true; row.step = function () {}; return row; });
   }
 
+  var widgetsOn = !!HomeProfile.config.homeWidgets, widgetsPaused = false, widgetNodes = [], widgetControl = null;
+  function syncHomeWidgets() {
+    if (widgetControl) widgetControl.sync(!document.hidden && !widgetsPaused && !sheetOpen() && st.zone !== Z.DRAWER);
+  }
+  function initHomeWidgets() {
+    if (!widgetsOn) return;
+    setClass(body, 'home-widgets', true);
+    var holder = $('home-widgets'), labels = HomeProfile.labels;
+    holder.innerHTML = '';
+    for (var i = 0; i < 2; i++) {
+      var card = el('button', 'home-widget', holder);
+      card.setAttribute('data-widget', i ? 'webosbrew' : 'arch');
+      el('div', 'widget-title', card, i ? 'webOSbrew' : labels.homelab || 'Homelab · Arch');
+      widgetNodes.push({status: el('div', 'widget-status', card), detail: el('div', 'widget-detail', card)});
+      hover(card, Z.WIDGETS, i);
+    }
+    var readUpdates = BrewUpdates.reader(function (done) { return TV.readBrewApps(done); }, BrewUpdates.repository);
+    widgetControl = HomeWidgets.controller(function (done) {return TV.readHomelab((HomeProfile.config.homelab || {}).host, done);}, readUpdates, window, renderHomeWidgets);
+    syncHomeWidgets();
+  }
+  function renderHomeWidgets(state) {
+    var s = state.lab, b = state.brew, labels = HomeProfile.labels;
+    function number(n, unit) {return typeof n === 'number' && isFinite(n) ? Math.round(n) + unit : '—';}
+    widgetNodes[0].status.textContent = s.loading ? labels.waiting || '…' : s.available ? labels.online || 'OK' : labels.offline || '—';
+    widgetNodes[0].detail.textContent = s.available ? 'CPU ' + number(s.cpuPercent, '%') + ' · RAM ' + number(s.usedMB, '') + '/' + number(s.totalMB, ' MB') + '\nDocker ' + number(s.dockerRunning, '') + '/' + number(s.dockerTotal, '') + ' · ' + number(s.temperature, ' °C') : '—';
+    widgetNodes[1].status.textContent = b.loading ? labels.waiting || '…' : !b.available ? labels.offline || '—' : (b.updates.length ? b.updates.length + ' ' + (labels.updates || 'updates') : labels.upToDate || 'OK');
+    widgetNodes[1].detail.textContent = b.available ? b.updates.slice(0, 2).map(function (app) {return app.title + ' · ' + app.installed + ' → ' + app.latest;}).join('\n') || (b.checked + ' ' + (labels.appsChecked || 'apps')) : '—';
+  }
+
   function openHomelab() {
     stopDiagnostics();
     homelabOn = true;
@@ -803,6 +835,10 @@
         else if (st.top === 4) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
         else openSettings();
         return;
+      case Z.WIDGETS:
+        if (st.widget === 0) openHomelab();
+        else launcher('org.webosbrew.hbchannel', 'webOSbrew')();
+        return;
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
         if (app) launcher(app.id, app.title)();
@@ -841,13 +877,20 @@
         if (dx) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dx));
         else if (dy > 0) { openDrawer(); return; }
         else if (dy < 0) {
-          if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(tiles[st.shelf])); }
+          if (widgetsOn) { st.zone = Z.WIDGETS; st.widget = nearest($('home-widgets').children, centerX(tiles[st.shelf])); }
+          else if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(tiles[st.shelf])); }
           else { st.zone = Z.TOP; st.top = st.tab; }
         }
+        break;
+      case Z.WIDGETS:
+        if (dx) st.widget = Math.max(0, Math.min(1, st.widget + dx));
+        else if (dy < 0) {st.zone = cards.length ? Z.CARDS : Z.TOP; st.top = st.tab;}
+        else if (dy > 0) {st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX($('home-widgets').children[st.widget]));}
         break;
       case Z.CARDS:
         if (dx) st.card = Math.max(0, Math.min(cards.length - 1, st.card + dx));
         else if (dy < 0) { st.zone = Z.TOP; st.top = st.tab; }
+        else if (widgetsOn) st.zone = Z.WIDGETS;
         else if (shelf.length) { st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX(cardNodes[st.card])); }
         break;
       case Z.TOP:
@@ -856,7 +899,7 @@
           if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
-          else st.zone = Z.SHELF;
+          else st.zone = widgetsOn ? Z.WIDGETS : Z.SHELF;
         }
         break;
       case Z.DRAWER:
@@ -904,6 +947,7 @@
       if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
       st.zone = zone;
       if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
+      else if (zone === Z.WIDGETS) st.widget = index;
       else if (zone === Z.CARDS) st.card = index;
       else if (zone === Z.SHELF) st.shelf = index;
       else if (zone === Z.DRAWER) st.drawer = index;
@@ -942,6 +986,8 @@
       var elapsed = Math.max(0, Date.now() - idleAt);
       nextSaverAttempt = Date.now() + 30000;
       TV.launch('com.webos.app.screensaver', {idleSource: 'freemytv', idleElapsedMs: elapsed}, function (ok) {
+        widgetsPaused = ok;
+        syncHomeWidgets();
         if (!ok && !document.hidden) toast(trf("Couldn't open {app}.", {app: 'Screensaver'}));
       });
       return;
@@ -994,6 +1040,8 @@
   function poke() {
     idleAt = Date.now();
     nextSaverAttempt = 0;
+    widgetsPaused = false;
+    syncHomeWidgets();
     if (saverOn) { hideSaver(); return true; }
     return false;
   }
@@ -1051,6 +1099,9 @@
 
   /** Back to the home screen (the app was opened again): the shelf, everything closed, the first tab. */
   function reset() {
+    widgetsPaused = false;
+    idleAt = Date.now();
+    nextSaverAttempt = 0;
     hideSaver();
     closeSheets();
     st.zone = Z.SHELF;
@@ -1081,14 +1132,18 @@
       hideSaver();
       if (diagnosticsOn || homelabOn) closeSheets();
       stopDiagnostics();
+      syncHomeWidgets();
       return;
     }
+    widgetsPaused = false;
+    syncHomeWidgets();
     idleAt = Date.now();
     nextSaverAttempt = 0;
     loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
   });
 
   I18N.set(Prefs.language());
+  initHomeWidgets();
   fit();
   renderTop();
   loadApps(function () {
