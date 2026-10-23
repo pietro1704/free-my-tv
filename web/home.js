@@ -934,13 +934,14 @@
   }
 
   var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0;
-  var SAVER_AFTER = (HomeProfile.config.idleMinutes || 5) * 60000;
+  var SAVER_AFTER = IdlePolicy.saverDelay(HomeProfile.config.idleMinutes), nextSaverAttempt = 0;
 
   function showSaver() {
     if (document.hidden) return;
     if (HomeProfile.config.nativeScreensaver) {
-      idleAt = Date.now();
-      TV.launch('com.webos.app.screensaver', null, function (ok) {
+      var elapsed = Math.max(0, Date.now() - idleAt);
+      nextSaverAttempt = Date.now() + 30000;
+      TV.launch('com.webos.app.screensaver', {idleSource: 'freemytv', idleElapsedMs: elapsed}, function (ok) {
         if (!ok && !document.hidden) toast(trf("Couldn't open {app}.", {app: 'Screensaver'}));
       });
       return;
@@ -992,6 +993,7 @@
 
   function poke() {
     idleAt = Date.now();
+    nextSaverAttempt = 0;
     if (saverOn) { hideSaver(); return true; }
     return false;
   }
@@ -1082,6 +1084,7 @@
       return;
     }
     idleAt = Date.now();
+    nextSaverAttempt = 0;
     loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
   });
 
@@ -1097,9 +1100,12 @@
     renderClock();
     checkNight();
     Data.refresh();
-    if (!saverOn && !sheetOpen() && Date.now() - idleAt > SAVER_AFTER) showSaver();
+    if (!HomeProfile.enabled && !saverOn && !sheetOpen() && Date.now() - idleAt > SAVER_AFTER) showSaver();
     if (saverOn) tickSaverClock($('saver').querySelector('.clock'));
   }, 30000);
+  if (HomeProfile.enabled) setInterval(function () {
+    if (!saverOn && IdlePolicy.due(Date.now(), idleAt, document.hidden, nextSaverAttempt, SAVER_AFTER)) showSaver();
+  }, 1000);
 
   // For the browser preview and tests.
   window.FreeMyTV = {state: st, move: move, activate: activate, back: back, showSaver: showSaver, hideSaver: hideSaver, toast: toast};
