@@ -66,6 +66,32 @@ test('missing app never selects a similarly named app and no profile preserves a
   assert.equal(defaults.inputs(inputs), inputs);
 });
 
+test('webOS discovery keeps exact custom apps when its paired app-list connection fails', () => {
+  const config = {homeProfile: {items: [{id: 'custom.youtube.adfree', title: 'YouTube'}, {id: 'custom.player', title: 'Player'}]}};
+  const context = {window: {CONFIG: config}, localStorage: {getItem() {return 'paired-key'}},
+    setTimeout() {return 1}, clearTimeout() {},
+    WebSocket: function () {throw new Error('connection unavailable')}};
+  const checked = [];
+  context.window.PalmServiceBridge = function () {
+    this.call = (uri, payload) => {
+      const request = JSON.parse(payload);
+      if (uri.endsWith('/listLaunchPoints')) this.onservicecallback('{"returnValue":false}');
+      else {
+        checked.push(request.appId);
+        this.onservicecallback(JSON.stringify({returnValue: true, exist: ['custom.youtube.adfree', 'custom.player', 'youtube.leanback.v4'].includes(request.appId)}));
+      }
+    };
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync('web/tv.js', 'utf8'), context);
+  let apps;
+  context.TV.apps(result => {apps = result});
+  assert.ok(checked.includes('custom.youtube.adfree'));
+  assert.ok(checked.includes('custom.player'));
+  assert.ok(apps.some(app => app.id === 'custom.youtube.adfree'));
+  assert.ok(apps.some(app => app.id === 'custom.player'));
+});
+
 test('CPU excludes guest double counting, RAM uses available, panel and compositor are distinct', () => {
   const d = load('diagnostics.js').Diagnostics;
   const s = d.parse(snapshot);

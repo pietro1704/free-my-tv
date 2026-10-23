@@ -156,14 +156,20 @@ var TV = (function () {
   ];
 
   function knownApps(done) {
-    var found = [], left = KNOWN.length, sent = false;
+    var profile = (window.CONFIG || {}).homeProfile, known = profile ? [] : KNOWN.slice();
+    var selected = profile && profile.items || [];
+    for (var k = 0; k < selected.length; k++) {
+      if (!HIDDEN.test(selected[k].id)) known.push([selected[k].id, selected[k].title || selected[k].id]);
+    }
+    var found = [], left = known.length, sent = false;
     function finish() {
       if (sent) return;
       sent = true;
       done(found.filter(function (x) { return x; }));
     }
     setTimeout(finish, 5000);   // an id that never answers doesn't hold the rest
-    KNOWN.forEach(function (k, i) {
+    if (!left) { finish(); return; }
+    known.forEach(function (k, i) {
       luna('luna://com.webos.applicationManager/getAppLoadStatus', {appId: k[0]}, function (res) {
         if (res && res.exist) found[i] = {id: k[0], title: k[1], icon: '', color: ''};
         if (--left === 0) finish();
@@ -299,6 +305,9 @@ var TV = (function () {
         done(SAMPLE.map(function (s) { return {id: s[0], title: s[1], icon: '', color: s[2]}; }));
         return;
       }
+      // A focused profile already supplies exact IDs and offline icons. Two availability checks are faster and
+      // more reliable than depending on the remote-control app-list session, which may expire between launches.
+      if ((window.CONFIG || {}).homeProfile) { knownApps(done); return; }
       function list(res) {
         var out = [];
         var points = res && res.launchPoints ? res.launchPoints : [];
