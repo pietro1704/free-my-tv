@@ -53,6 +53,9 @@ def read_config(path):
             profile = json.load(f)
         if not isinstance(profile, dict) or not isinstance(profile.get('items'), list):
             sys.exit('home_profile must contain an items array')
+        for item in profile['items']:
+            if not isinstance(item, dict) or not isinstance(item.get('id'), str) or not item['id'] or item['id'] != item['id'].strip():
+                sys.exit('home_profile items must have exact, nonempty string IDs')
 
     return {
         'tmdbKey': values.get('tmdb_key', ''),
