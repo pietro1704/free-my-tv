@@ -29,6 +29,10 @@
   }
 
   function coin(i, parent) {
+    if (HomeProfile.config.forex && i >= 3) {
+      el('span', 'currency-mark', parent, i === 3 ? '$' : '€');
+      return;
+    }
     var c = window.COINS && window.COINS[i];
     if (!c) return;
     var ns = 'http://www.w3.org/2000/svg';
@@ -115,6 +119,11 @@
   var apps = [], shelf = [], others = [], inputs = [];
 
   function pickShelf() {
+    if (HomeProfile.enabled) {
+      shelf = HomeProfile.shelf(apps, inputs);
+      others = [];
+      return;
+    }
     var chosen = Prefs.shelf(), out = [];
     if (chosen) {
       for (var i = 0; i < chosen.length && out.length < MAX_SHELF; i++) {
@@ -207,6 +216,7 @@
     var buttons = $('buttons');
     buttons.innerHTML = '';
     var defs = [['live_tv', tr('light|Live TV')], ['hdmi', tr('HDMI Inputs')], ['settings', tr('light|Settings')]];
+    if (HomeProfile.enabled) defs[0] = ['settings', HomeProfile.labels.diagnostics || 'CPU / RAM / Hz'];
     for (var b = 0; b < 3; b++) {
       var r = el('button', 'round' + (b === 2 ? ' last' : ''), buttons);
       r.style.left = (1596 + 88 * b) + 'px';
@@ -302,6 +312,7 @@
     tiles.innerHTML = '';
     for (var i = 0; i < n; i++) {
       var t = el('div', 'tile', tiles);
+      t.setAttribute('data-app-id', shelf[i].id);
       t.style.left = (left + i * (tw + gap)) + 'px';
       t.style.top = (854 + 126 - th) + 'px';
       t.style.width = tw + 'px';
@@ -325,7 +336,7 @@
       drawerItems.push({label: x.label || tr('Live TV'), symbol: x.symbol, off: !x.connected, run: launcher(x.id, x.label)});
     }
     drawerInputs = drawerItems.length;
-    drawerItems.push({label: tr('All Apps'), symbol: 'apps', run: openApps});
+    if (!HomeProfile.enabled) drawerItems.push({label: tr('All Apps'), symbol: 'apps', run: openApps});
     drawerItems.push({label: tr('Home Settings'), symbol: 'settings', run: openSettings});
     drawerItems.push({label: tr('TV Settings'), symbol: 'tv_settings', run: tvSettings});
     var n = drawerItems.length, gap = 18, groupGap = 56, groups = drawerInputs > 0 && drawerInputs < n ? 2 : 1;
@@ -379,6 +390,16 @@
       el('div', 'cond', card, tr('No weather data right now.')).style.top = '96px';
       return;
     }
+    if (HomeProfile.config.forecastOnly) {
+      var forecast = el('div', 'forecast-days', card), labels = HomeProfile.labels;
+      for (var f = 0; f < w.days.length; f++) {
+        var day = w.days[f], row = el('div', 'forecast-row', forecast);
+        el('div', 'forecast-day', row, f === 0 ? labels.today || day.date : labels.tomorrow || day.date);
+        el('div', 'forecast-range', row, (day.min === null ? '—' : Data.degrees(day.min)) + ' – ' + (day.max === null ? '—' : Data.degrees(day.max)));
+        el('div', 'forecast-rain', row, (labels.rain || '%') + ' ' + (day.rain === null ? '—' : Math.round(day.rain) + '%'));
+      }
+      return;
+    }
     var now = el('div', 'now', card);
     sym(Data.symbol(w.code, w.isDay), now);
     el('span', 'temp', now, Data.degrees(w.temp));
@@ -400,7 +421,7 @@
   }
 
   function renderPrices(card, coins) {
-    el('div', 'head', card, tr('Crypto'));
+    el('div', 'head', card, HomeProfile.labels.quotes || tr('Crypto'));
     var stale = Data.staleness(Data.pricesAt, 5 * 60000);
     el('div', 'side', card, stale ? trf('quotes|{ago}', {ago: stale}) : tr('24h change'));
     for (var j = 0; j < coins.length; j++) {
@@ -455,6 +476,7 @@
   }
 
   function closeSheets() {
+    stopDiagnostics();
     setClass($('apps'), 'open', false);
     setClass($('settings'), 'open', false);
     setClass($('shelfedit'), 'open', false);
@@ -466,7 +488,58 @@
 
   // MARK: - Home Settings
 
+  var diagnosticsOn = false, diagnosticStats = {}, diagnosticMonitor = Diagnostics.monitor(TV.readStats);
+  var frameRequest = null, frameStart = null, frameTimes = [], uiFps = null;
+  function stopDiagnostics() {
+    diagnosticsOn = false;
+    diagnosticMonitor.stop();
+    if (frameRequest !== null) window.cancelAnimationFrame(frameRequest);
+    frameRequest = null;
+    frameStart = null;
+    frameTimes = [];
+  }
+  function openDiagnostics() {
+    stopDiagnostics();
+    diagnosticsOn = true;
+    diagnosticStats = {};
+    uiFps = null;
+    st.zone = Z.SETTINGS;
+    st.row = 0;
+    setClass($('settings'), 'open', true);
+    function frame(at) {
+      if (!diagnosticsOn || document.hidden) return;
+      if (frameStart !== null && at > frameStart) frameTimes.push(at - frameStart);
+      frameStart = at;
+      if (frameTimes.length >= 120) {
+        var total = 0;
+        for (var i = 0; i < frameTimes.length; i++) total += frameTimes[i];
+        uiFps = 1000 * frameTimes.length / total;
+        frameTimes = [];
+      }
+      frameRequest = window.requestAnimationFrame(frame);
+    }
+    frameRequest = window.requestAnimationFrame(frame);
+    renderSettings();
+    diagnosticMonitor.start(function (stats) {
+      if (!diagnosticsOn || document.hidden) return;
+      diagnosticStats = stats;
+      renderSettings();
+    });
+  }
+  function diagnosticRows() {
+    function value(n, unit) { return typeof n === 'number' && isFinite(n) ? Math.round(n) + unit : '—'; }
+    var s = diagnosticStats, labels = HomeProfile.labels;
+    return [
+      {label: 'CPU', value: value(s.cpuPercent, '%')},
+      {label: 'RAM', value: value(s.usedMB, '') + ' / ' + value(s.totalMB, ' MB')},
+      {label: labels.panel || 'Panel (driver)', value: value(s.panelHz, ' Hz')},
+      {label: labels.compositor || 'Compositor', value: value(s.compositorHz, ' Hz')},
+      {label: 'UI FPS', value: value(uiFps, ' FPS')}
+    ].map(function (row) { row.readOnly = true; row.step = function () {}; return row; });
+  }
+
   function settingRows() {
+    if (diagnosticsOn) return diagnosticRows();
     var unit = Prefs.temperature(), theme = Prefs.theme();
     var auto = tr('Automatic'), picked = pickedLanguage();
     var rows = [
@@ -481,16 +554,25 @@
       {label: tr('Quotes widget'), toggle: Prefs.quotes(),
         step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
     ];
-    var names = ['Bitcoin', 'Ethereum', 'Solana', tr('Dollar')];
-    var count = Data.currency === 'BRL' ? 4 : 3;
+    var names = ['Bitcoin', 'Ethereum', 'Solana', tr('Dollar'), 'Euro'];
+    var count = HomeProfile.config.forex ? 5 : Data.currency === 'BRL' ? 4 : 3;
     for (var i = 0; i < count; i++) {
+      if (HomeProfile.config.forex && (i === 1 || i === 2)) continue;
       (function (i) {
         rows.push({label: names[i], toggle: Prefs.quotes() && Prefs.coin(i), dim: !Prefs.quotes(),
           step: function () { if (Prefs.quotes()) { Prefs.setCoin(i, !Prefs.coin(i)); Data.settingsChanged(); } }});
       })(i);
     }
-    rows.push({label: tr('Shelf'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
+    if (!HomeProfile.enabled) rows.push({label: tr('Shelf'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('TV Settings'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
+    if (HomeProfile.enabled) {
+      rows.push({label: HomeProfile.labels.diagnostics || 'CPU / RAM / Hz', value: '›',
+        step: function () { openDiagnostics(); }});
+      var tools = HomeProfile.config.tools || [];
+      for (var t = 0; t < tools.length; t++) {
+        (function (tool) { rows.push({label: tool.title, value: '›', step: launcher(tool.id, tool.title)}); })(tools[t]);
+      }
+    }
     return rows;
   }
 
@@ -506,7 +588,7 @@
     box.innerHTML = '';
     var title = el('div', 'title', box);
     sym('settings', title);
-    title.appendChild(document.createTextNode(tr('Home Settings')));
+    title.appendChild(document.createTextNode(diagnosticsOn ? 'CPU · RAM · Hz' : tr('Home Settings')));
     var list = el('div', 'list', box), holder = el('div', 'rows', list);
     rowsNow = settingRows();
     list.style.height = Math.min(rowsNow.length, 7) * 78 + 'px';
@@ -515,7 +597,7 @@
       if (r.toggle !== undefined) setClass(el('div', 'toggle', row), 'on', r.toggle);
       else {
         var v = el('span', 'value', row);
-        if (r.value === '›') v.textContent = '›';
+        if (r.readOnly || r.value === '›') v.textContent = r.value;
         else if (r.opens) { v.appendChild(document.createTextNode(r.value)); el('span', 'chev', v, '›'); }
         else { el('span', 'chev', v, '‹'); v.appendChild(document.createTextNode(r.value)); el('span', 'chev', v, '›'); }
       }
@@ -526,6 +608,7 @@
   }
 
   function openSettings() {
+    stopDiagnostics();
     st.zone = Z.SETTINGS;
     st.row = 0;
     renderSettings();
@@ -670,7 +753,10 @@
     switch (st.zone) {
       case Z.TOP:
         if (st.top < 3) return;
-        if (st.top === 3) { var live = liveTV(); if (live) launcher(live.id, tr('Live TV'))(); }
+        if (st.top === 3) {
+          if (HomeProfile.enabled) openDiagnostics();
+          else { var live = liveTV(); if (live) launcher(live.id, tr('Live TV'))(); }
+        }
         else if (st.top === 4) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
         else openSettings();
         return;
@@ -757,6 +843,7 @@
   }
 
   function back() {
+    if (diagnosticsOn) { openSettings(); return; }
     if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
     if (st.zone === Z.LANG) { closeLanguages(false); return; }
     if (sheetOpen()) { closeSheets(); return; }
@@ -803,9 +890,18 @@
     setClass(body, 'night', Data.isNight(Date.now()));
   }
 
-  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, SAVER_AFTER = 5 * 60000;
+  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0;
+  var SAVER_AFTER = (HomeProfile.config.idleMinutes || 5) * 60000;
 
   function showSaver() {
+    if (document.hidden) return;
+    if (HomeProfile.config.nativeScreensaver) {
+      idleAt = Date.now();
+      TV.launch('com.webos.app.screensaver', null, function (ok) {
+        if (!ok && !document.hidden) toast(trf("Couldn't open {app}.", {app: 'Screensaver'}));
+      });
+      return;
+    }
     var photos = Data.showcase().filter(function (p) { return p.backdrop && Data.appFor(p.app); });
     saverOn = true;
     var s = $('saver');
@@ -900,9 +996,9 @@
     TV.apps(function (list) {
       apps = list.filter(function (a) { return !hidden(a); });
       Data.setApps(apps);
-      pickShelf();
       TV.inputs(function (list2) {
-        inputs = list2;
+        inputs = HomeProfile.inputs(list2);
+        pickShelf();
         if (done) done();
       });
     });
@@ -936,7 +1032,12 @@
   document.addEventListener('webOSRelaunch', reopened);   // LG: opened again while running
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { hideSaver(); return; }
+    if (document.hidden) {
+      hideSaver();
+      if (diagnosticsOn) closeSheets();
+      stopDiagnostics();
+      return;
+    }
     idleAt = Date.now();
     loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
   });
@@ -949,6 +1050,7 @@
     Data.refresh();
   });
   setInterval(function () {
+    if (document.hidden) return;
     renderClock();
     checkNight();
     Data.refresh();

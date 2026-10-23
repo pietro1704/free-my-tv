@@ -93,7 +93,10 @@ var Data = (function () {
   var weather = null, weatherAt = 0, fetchingWeather = false;
   (function () {
     var w = stored('weather');
-    if (w && w.place === PLACE) { weather = parseWeather(w.body); weatherAt = w.at; }
+    if (w && w.place === PLACE) {
+      weather = parseWeather(w.body);
+      weatherAt = w.body.daily && w.body.daily.precipitation_probability_max ? w.at : 0;
+    }
   })();
 
   /** "2026-10-20T18:31" at the location (Open-Meteo's local time) → epoch ms. */
@@ -109,7 +112,7 @@ var Data = (function () {
     var w = {
       temp: o.current.temperature_2m, code: o.current.weather_code, isDay: o.current.is_day !== 0,
       max: o.daily.temperature_2m_max[0], min: o.daily.temperature_2m_min[0],
-      sunrise: localTime(o.daily.sunrise[0], off), sunset: localTime(o.daily.sunset[0], off), hours: []
+      sunrise: localTime(o.daily.sunrise[0], off), sunset: localTime(o.daily.sunset[0], off), hours: [], days: Forecast.days(o.daily)
     };
     var hr = o.hourly;
     for (var i = 0; hr && i < hr.time.length && w.hours.length < 6; i++) {
@@ -125,7 +128,7 @@ var Data = (function () {
     if (fetchingWeather || (now - weatherAt < 30 * 60000 && now >= weatherAt)) return;
     fetchingWeather = true;
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + Place.lat + '&longitude=' + Place.lon
-        + '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset'
+        + '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max'
         + '&hourly=temperature_2m,weather_code,is_day&timezone=auto&forecast_days=2';
     get(url, {}, function (err, body) {
       fetchingWeather = false;
@@ -139,7 +142,8 @@ var Data = (function () {
 
   // MARK: - Prices
 
-  var COINS = ['BTC', 'ETH', 'SOL', 'USDT'];
+  var FOREX = !!(CONFIG.homeProfile && CONFIG.homeProfile.forex && Place.currency === 'BRL');
+  var COINS = FOREX ? ['BTC', 'ETH', 'SOL', 'USD', 'EUR'] : ['BTC', 'ETH', 'SOL', 'USDT'];
   var CURRENCY = Place.currency;
   var QUOTE = CURRENCY === 'USD' ? 'USDT' : CURRENCY;
   /** Binance refuses the whole request when it has no pairs in the currency (INR...): the prices go in dollars then. */
@@ -158,7 +162,10 @@ var Data = (function () {
   function activeCoins() {
     var out = [];
     if (!Prefs.quotes()) return out;
-    for (var i = 0; i < COINS.length; i++) if (Prefs.coin(i) && (i < 3 || CURRENCY === 'BRL')) out.push(i);
+    for (var i = 0; i < COINS.length; i++) {
+      if (FOREX && (i === 1 || i === 2)) continue;
+      if (Prefs.coin(i) && (i < 3 || CURRENCY === 'BRL')) out.push(i);
+    }
     return out;
   }
 
@@ -178,13 +185,27 @@ var Data = (function () {
 
   (function () {
     var p = stored('prices');
-    if (p && p.quote === QUOTE && parsePrices(p.body)) pricesAt = p.at;
+    if (p && p.quote === QUOTE && (!FOREX || p.source === 'forex') && parsePrices(p.body)) pricesAt = p.at;
   })();
 
   function refreshPrices() {
     var coins = activeCoins(), now = Date.now();
     if (!coins.length || fetchingPrices || (now - pricesAt < 5 * 60000 && now >= pricesAt)) return;
     fetchingPrices = true;
+    if (FOREX) {
+      var selected = coins.map(function (i) { return COINS[i]; });
+      var pairs = selected.map(function (symbol) { return symbol + '-BRL'; }).join(',');
+      get('https://economia.awesomeapi.com.br/json/last/' + pairs, {}, function (err, body) {
+        fetchingPrices = false;
+        if (err) return;
+        var list = Forex.quotes(body, selected);
+        if (!list || !parsePrices(list)) return;
+        pricesAt = Date.now();
+        store('prices', {quote: QUOTE, source: 'forex', body: list, at: pricesAt});
+        changed();
+      });
+      return;
+    }
     var symbols = coins.map(function (i) { return '%22' + COINS[i] + QUOTE + '%22'; }).join(',');
     var path = '/api/v3/ticker/24hr?type=MINI&symbols=%5B' + symbols + '%5D';
     // Binance.com refuses the US (HTTP 451); Binance.US answers the same call in dollars.
@@ -232,6 +253,8 @@ var Data = (function () {
 
   /** The installed app for a service key, or null. */
   function appFor(key) {
+    var profileApp = typeof HomeProfile !== 'undefined' && HomeProfile.catalogApp(installed);
+    if (profileApp) return profileApp;
     for (var s = 0; s < SERVICES.length; s++) {
       if (SERVICES[s][1] !== key) continue;
       for (var i = 0; i < installed.length; i++) {
@@ -591,6 +614,6 @@ var Data = (function () {
       if (code >= 95) return 'thunderstorm';
       return 'rainy';
     },
-    coinName: function (i) { return i === 3 ? tr('Dollar') : ['Bitcoin', 'Ethereum', 'Solana'][i]; }
+    coinName: function (i) { return i === 3 ? tr('Dollar') : i === 4 ? 'Euro' : ['Bitcoin', 'Ethereum', 'Solana'][i]; }
   };
 })();

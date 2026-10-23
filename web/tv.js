@@ -31,6 +31,12 @@ var TV = (function () {
       if (done) done(result && result.returnValue !== false ? result : null);
     };
     bridge.call(uri, JSON.stringify(params || {}));
+    return function () {
+      finished = true;
+      if (bridge.cancel) bridge.cancel();
+      var i = calls.indexOf(bridge);
+      if (i >= 0) calls.splice(i, 1);
+    };
   }
 
   // webOS 6 gives Developer Mode apps only the "public" group, which leaves out listLaunchPoints. There the list comes
@@ -276,6 +282,15 @@ var TV = (function () {
 
   return {
     name: webos ? 'webos' : samsung ? 'tizen' : 'browser',
+
+    /** Rooted LG TVs only. Fixed read-only command; never takes shell text from the UI. */
+    readStats: function (done) {
+      var command = "awk '/^cpu / || /^MemTotal:/ || /^MemAvailable:/ || /^[ \\t]*mode:/ || /^dispFramerate/ {print}' /proc/stat /proc/meminfo /sys/kernel/debug/dri/0/state /proc/lg/ovi/status";
+      if (!webos) { done(null); return null; }
+      return luna('luna://org.webosbrew.hbchannel.service/exec', {command: command}, function (res) {
+        done(res && typeof res.stdoutString === 'string' ? res.stdoutString : null);
+      });
+    },
 
     /** Installed apps, as the TV's launcher lists them: [{id, title, icon, color}]. */
     apps: function (done) {
