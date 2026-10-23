@@ -298,6 +298,14 @@ var TV = (function () {
       });
     },
 
+    readHomelab: function (host, done) {
+      var command = Homelab.command(host);
+      if (!webos || !command) { done(null); return null; }
+      return luna('luna://org.webosbrew.hbchannel.service/exec', {command: command}, function (res) {
+        done(res && typeof res.stdoutString === 'string' ? res.stdoutString : null);
+      });
+    },
+
     /** Installed apps, as the TV's launcher lists them: [{id, title, icon, color}]. */
     apps: function (done) {
       if (samsung) { samsungApps(done); return; }

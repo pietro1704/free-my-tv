@@ -26,8 +26,9 @@ var Diagnostics = (function () {
     }
     return total > 0 ? (total - idle) * 100 / total : null;
   }
-  function monitor(read, timers) {
+  function monitor(read, timers, options) {
     timers = timers || window;
+    options = options || {};
     var generation = 0, timer = null, deadline = null, cancel = null, previous = null;
     function stop() {
       generation++;
@@ -42,7 +43,7 @@ var Diagnostics = (function () {
       stop: stop,
       start: function (done) {
         stop();
-        var session = generation;
+        var session = generation, samples = 0;
         function sample() {
           if (session !== generation) return;
           var finished = false;
@@ -51,13 +52,15 @@ var Diagnostics = (function () {
             finished = true;
             if (deadline !== null) timers.clearTimeout(deadline);
             deadline = null;
-            var stats = parse(text || '');
+            var stats = (options.parse || parse)(text || '');
             stats.cpuPercent = percent(previous, stats.cpu);
             previous = stats.cpu;
             done(stats);
-            if (session === generation) timer = timers.setTimeout(sample, 5000);
+            samples++;
+            var delay = samples === 1 && options.warmup ? options.warmup : options.every || 5000;
+            if (session === generation) timer = timers.setTimeout(sample, delay);
           }
-          deadline = timers.setTimeout(function () { if (cancel) cancel(); finish(null); }, 4000);
+          deadline = timers.setTimeout(function () { if (cancel) cancel(); finish(null); }, options.timeout || 4000);
           var requestCancel = null;
           try { requestCancel = read(finish) || null; } catch (error) { finish(null); }
           if (session === generation && !finished) cancel = requestCancel;

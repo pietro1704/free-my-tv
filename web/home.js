@@ -488,11 +488,17 @@
 
   // MARK: - Home Settings
 
-  var diagnosticsOn = false, diagnosticStats = {}, diagnosticMonitor = Diagnostics.monitor(TV.readStats);
+  var diagnosticsOn = false, diagnosticStats = {}, diagnosticMonitor = Diagnostics.monitor(function (done) { return TV.readStats(done); });
+  var homelabOn = false, homelabStats = {}, homelabAt = 0;
+  var homelabMonitor = Diagnostics.monitor(function (done) {
+    return TV.readHomelab((HomeProfile.config.homelab || {}).host, done);
+  }, window, {parse: Homelab.parse, every: 30000, warmup: 1500, timeout: 8000});
   var frameRequest = null, frameStart = null, frameTimes = [], uiFps = null;
   function stopDiagnostics() {
     diagnosticsOn = false;
+    homelabOn = false;
     diagnosticMonitor.stop();
+    homelabMonitor.stop();
     if (frameRequest !== null) window.cancelAnimationFrame(frameRequest);
     frameRequest = null;
     frameStart = null;
@@ -538,7 +544,43 @@
     ].map(function (row) { row.readOnly = true; row.step = function () {}; return row; });
   }
 
+  function openHomelab() {
+    stopDiagnostics();
+    homelabOn = true;
+    homelabStats = {loading: true};
+    homelabAt = 0;
+    st.zone = Z.SETTINGS;
+    st.row = 0;
+    setClass($('settings'), 'open', true);
+    renderSettings();
+    homelabMonitor.start(function (stats) {
+      if (!homelabOn || document.hidden) return;
+      homelabStats = stats;
+      homelabAt = stats.available ? Date.now() : 0;
+      renderSettings();
+    });
+  }
+  function homelabRows() {
+    var s = homelabStats, labels = HomeProfile.labels;
+    function value(n, unit) { return typeof n === 'number' && isFinite(n) ? Math.round(n) + unit : '—'; }
+    var uptime = typeof s.uptimeSeconds === 'number' && isFinite(s.uptimeSeconds)
+      ? Math.floor(s.uptimeSeconds / 86400) + 'd ' + Math.floor(s.uptimeSeconds % 86400 / 3600) + 'h' : '—';
+    var readAt = homelabAt ? new Date(homelabAt) : null;
+    var readTime = readAt ? [readAt.getHours(), readAt.getMinutes(), readAt.getSeconds()].map(function (n) { return (n < 10 ? '0' : '') + n; }).join(':') : '—';
+    return [
+      {label: labels.homelabStatus || 'Status', value: s.loading ? labels.waiting || '…' : s.available ? labels.online || 'OK' : labels.offline || '—'},
+      {label: 'CPU', value: value(s.cpuPercent, '%')},
+      {label: labels.load || 'Load 1m', value: typeof s.load1 === 'number' && isFinite(s.load1) ? s.load1.toFixed(2) : '—'},
+      {label: 'RAM', value: value(s.usedMB, '') + ' / ' + value(s.totalMB, ' MB')},
+      {label: labels.uptime || 'Uptime', value: uptime},
+      {label: labels.docker || 'Docker', value: value(s.dockerRunning, '') + ' / ' + value(s.dockerTotal, '')},
+      {label: labels.temperature || 'CPU °C', value: value(s.temperature, ' °C')},
+      {label: labels.received || 'HH:mm:ss', value: readTime}
+    ].map(function (row) { row.readOnly = true; row.step = function () {}; return row; });
+  }
+
   function settingRows() {
+    if (homelabOn) return homelabRows();
     if (diagnosticsOn) return diagnosticRows();
     var unit = Prefs.temperature(), theme = Prefs.theme();
     var auto = tr('Automatic'), picked = pickedLanguage();
@@ -568,6 +610,7 @@
     if (HomeProfile.enabled) {
       rows.push({label: HomeProfile.labels.diagnostics || 'CPU / RAM / Hz', value: '›',
         step: function () { openDiagnostics(); }});
+      if (HomeProfile.config.homelab) rows.push({label: HomeProfile.labels.homelab || 'Homelab', value: '›', step: openHomelab});
       var tools = HomeProfile.config.tools || [];
       for (var t = 0; t < tools.length; t++) {
         (function (tool) { rows.push({label: tool.title, value: '›', step: launcher(tool.id, tool.title)}); })(tools[t]);
@@ -588,7 +631,7 @@
     box.innerHTML = '';
     var title = el('div', 'title', box);
     sym('settings', title);
-    title.appendChild(document.createTextNode(diagnosticsOn ? 'CPU · RAM · Hz' : tr('Home Settings')));
+    title.appendChild(document.createTextNode(homelabOn ? HomeProfile.labels.homelab || 'Homelab' : diagnosticsOn ? 'CPU · RAM · Hz' : tr('Home Settings')));
     var list = el('div', 'list', box), holder = el('div', 'rows', list);
     rowsNow = settingRows();
     list.style.height = Math.min(rowsNow.length, 7) * 78 + 'px';
@@ -843,7 +886,7 @@
   }
 
   function back() {
-    if (diagnosticsOn) { openSettings(); return; }
+    if (diagnosticsOn || homelabOn) { openSettings(); return; }
     if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
     if (st.zone === Z.LANG) { closeLanguages(false); return; }
     if (sheetOpen()) { closeSheets(); return; }
@@ -1034,7 +1077,7 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
       hideSaver();
-      if (diagnosticsOn) closeSheets();
+      if (diagnosticsOn || homelabOn) closeSheets();
       stopDiagnostics();
       return;
     }
