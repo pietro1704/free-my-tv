@@ -52,3 +52,9 @@ test('webOS uses the managed helper rather than launching an unmanaged native wi
  requests.length=0;c.TV.launch('com.webos.app.screensaver',{idleElapsedMs:15000},value=>ok=value);assert.equal(ok,false);assert.equal(requests.length,0);
  c.TV.launch('space.nuvio.webos',null,()=>{});assert.equal(requests[0].uri,'luna://com.webos.applicationManager/launch');
 });
+
+test('confirmation has a wall-clock deadline even when replies arrive slowly',()=>{
+ const original=Date.now;let now=0,waits=0;Date.now=()=>now;
+ try {const h=harness({neverReady:true});const out=native.start(h.call,15000,()=>{now+=1000;waits++});assert.equal(out.returnValue,false);assert.ok(waits<=3);assert.ok(h.calls.at(-1).method.endsWith('/closeByAppId'));}
+ finally {Date.now=original;}
+});
