@@ -1,0 +1,17 @@
+{
+  "dashboard": true,
+  "homeWidgets": true,
+  "providerPicks": false,
+  "nativeScreensaver": true,
+  "idleMinutes": 0.25,
+  "youtubeApp": "com.cobalt.youtube.adfree",
+  "catalogApp": "space.nuvio.webos",
+  "homelab": {"host": "127.0.0.1"},
+  "items": [
+    {"id": "com.cobalt.youtube.adfree", "title": "YouTube", "icon": "icons/youtube.png"},
+    {"id": "space.nuvio.webos", "title": "Nuvio"},
+    {"id": "com.webos.app.hdmi2", "title": "Receiver"},
+    {"id": "com.webos.app.hdmi3", "title": "PS5"}
+  ],
+  "labels": {"youtubeTab": "YouTube", "newsTab": "Notícias", "mediaTab": "Mídia", "infoTab": "Infos"}
+}

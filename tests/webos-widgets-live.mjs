@@ -30,7 +30,7 @@ async function evaluate(expression) {
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 try {
   for (let i = 0; i < 40; i++) {
-    if (await evaluate("typeof FreeMyTV !== 'undefined' && document.querySelectorAll('#home-widgets button').length === 2")) break;
+    if (await evaluate("typeof FreeMyTV !== 'undefined' && document.querySelectorAll('#home-widgets button').length >= 2")) break;
     await wait(250);
   }
   await evaluate(`window.__widgetsKeepAlive = setInterval(function () {document.dispatchEvent(new MouseEvent('mousemove'))}, 4000);
@@ -39,7 +39,7 @@ try {
     window.__widgetsCalls = {lab: 0, brew: 0};
     TV.readHomelab = function (host, done) {window.__widgetsCalls.lab++; return window.__widgetsLab(host, done)};
     TV.readBrewApps = function (done) {window.__widgetsCalls.brew++; return window.__widgetsBrew(done)};`);
-  const text = "Array.prototype.map.call(document.querySelectorAll('#home-widgets button'), function (node) {return node.textContent})";
+  const text = "['arch','webosbrew'].map(function (kind) {return document.querySelector('[data-widget=' + kind + ']').textContent})";
   let widgets;
   for (let i = 0; i < 44; i++) {
     widgets = await evaluate(text);

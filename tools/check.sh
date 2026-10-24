@@ -25,6 +25,7 @@ if [ "$what" = all ] || [ "$what" = web ]; then
   node --test tests/idle.test.cjs
   node --test tests/provider-picks.test.cjs
   node --test tests/widgets.test.cjs
+  node --test tests/dashboard.test.cjs
   python3 tests/webapp-config.test.py
   python3 tools/translate.py --check
 
