@@ -8,9 +8,9 @@ import {spawn} from 'node:child_process';
 const browser = process.env.CHROMIUM || '/Applications/Chromium.app/Contents/MacOS/Chromium';
 const preview = path.resolve(process.env.DASHBOARD_PREVIEW || 'out/webos/index.html');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'lg-dashboard-browser-'));
-const child = spawn(browser, ['--headless', '--allow-file-access-from-files', '--disable-background-networking', '--disable-sync', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], {stdio: 'ignore'});
+const child = spawn(browser, ['--headless', '--allow-file-access-from-files', '--disable-background-networking', '--disable-sync', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], {stdio: 'ignore', detached: true});
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-let ws; const pending = new Map(); let id = 0;
+let ws, closeBrowser; const pending = new Map(); let id = 0;
 const errors = [];
 try {
   const portFile = path.join(profile, 'DevToolsActivePort');
@@ -33,6 +33,7 @@ try {
       pending.set(sequence, {timer, resolve, reject}); ws.send(JSON.stringify({id: sequence, method, params}));
     });
   }
+  closeBrowser = () => call('Browser.close');
   async function evaluate(expression) {
     const result = await call('Runtime.evaluate', {expression, returnByValue:true, awaitPromise:true});
     assert.equal(result.exceptionDetails, undefined, 'Dashboard threw a JavaScript exception'); return result.result.value;
@@ -104,8 +105,12 @@ try {
   console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,unconnectedFeedsExplicit:true,oledPolicyPreserved:true}));
   }
 } finally {
+  // Let Chrome flush and stop its helpers before deleting their profile, including on Linux CI.
+  if(closeBrowser) {try {await Promise.race([closeBrowser(),wait(2000)]);} catch(error) {}}
   if(ws) ws.close(); for(const request of pending.values())clearTimeout(request.timer);
-  child.kill('SIGTERM');
-  await new Promise(resolve=>{if(child.exitCode!==null)resolve();else{child.once('exit',resolve);setTimeout(resolve,3000);}});
-  fs.rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});
+  if(child.exitCode===null) await Promise.race([new Promise(resolve=>child.once('exit',resolve)),wait(5000)]);
+  try {process.kill(-child.pid,'SIGTERM');} catch(error) {if(error.code!=='ESRCH')throw error;}
+  if(child.exitCode===null) await Promise.race([new Promise(resolve=>child.once('exit',resolve)),wait(2000)]);
+  try {process.kill(-child.pid,'SIGKILL');} catch(error) {if(error.code!=='ESRCH')throw error;}
+  fs.rmSync(profile,{recursive:true,force:true,maxRetries:10,retryDelay:200});
 }
