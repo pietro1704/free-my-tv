@@ -26,6 +26,9 @@ if [ "$what" = all ] || [ "$what" = web ]; then
   node --test tests/provider-picks.test.cjs
   node --test tests/widgets.test.cjs
   node --test tests/dashboard.test.cjs
+  node --test tests/disney-mapping.test.cjs
+  sh -n webos/controls/start.sh
+  sh -n webos/controls/watch.sh
   python3 tests/webapp-config.test.py
   python3 tools/translate.py --check
 
