@@ -532,3 +532,14 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* The Magic Remote's pointer: no text selection, no outlines. */
 * { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+/* Home widgets keep their place below the future video/news area and above the app shelf. */
+#home-widgets { position: absolute; left: 80px; top: 570px; width: 1760px; height: 210px; display: none; }
+.home-widgets #home-widgets { display: block; }
+.home-widgets #clock { top: 275px; font-size: 132px; }
+.home-widget { position: absolute; left: 0; top: 0; width: 860px; height: 210px; padding: 22px 28px; border: 2px solid #353539; border-radius: 22px; text-align: left; background: #161618; color: #aaa; overflow: hidden; }
+.home-widget + .home-widget { left: 900px; }
+.home-widget.focus { border-color: #aaa; background: #242426; }
+.widget-title { font-size: 28px; font-weight: 600; color: #bbb; }
+.widget-status { font-size: 26px; margin-top: 8px; }
+.widget-detail { font-size: 22px; line-height: 30px; margin-top: 7px; white-space: pre-line; overflow: hidden; }

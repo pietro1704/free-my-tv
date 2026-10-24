@@ -306,6 +306,14 @@ var TV = (function () {
       });
     },
 
+    readBrewApps: function (done) {
+      if (!webos) { done(null); return null; }
+      var command = 'printf "["; separator=""; for appinfo in /media/developer/apps/usr/palm/applications/*/appinfo.json; do [ -f "$appinfo" ] || continue; printf "%s" "$separator"; cat "$appinfo"; separator=","; done; printf "]"';
+      return luna('luna://org.webosbrew.hbchannel.service/exec', {command: command}, function (res) {
+        done(res && typeof res.stdoutString === 'string' ? res.stdoutString : null);
+      });
+    },
+
     /** Installed apps, as the TV's launcher lists them: [{id, title, icon, color}]. */
     apps: function (done) {
       if (samsung) { samsungApps(done); return; }
