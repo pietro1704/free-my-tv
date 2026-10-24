@@ -1048,15 +1048,17 @@
     setClass(body, 'night', Data.isNight(Date.now()));
   }
 
-  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0;
+  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverGeneration = 0;
   var SAVER_AFTER = IdlePolicy.saverDelay(HomeProfile.config.idleMinutes), nextSaverAttempt = 0;
 
   function showSaver() {
     if (document.hidden) return;
     if (HomeProfile.config.nativeScreensaver) {
-      var elapsed = Math.max(0, Date.now() - idleAt);
+      var origin = idleAt, generation = ++saverGeneration, elapsed = Math.max(0, Date.now() - idleAt);
       nextSaverAttempt = Date.now() + 30000;
       TV.launch('com.webos.app.screensaver', {idleSource: 'freemytv', idleElapsedMs: elapsed}, function (ok) {
+        if (generation !== saverGeneration) return;
+        if (document.hidden || origin !== idleAt) {if (ok) TV.dismissScreensaver();return;}
         widgetsPaused = ok;
         syncHomeWidgets();
         if (!ok && !document.hidden) toast(trf("Couldn't open {app}.", {app: 'Screensaver'}));
@@ -1196,6 +1198,7 @@
   }
 
   window.addEventListener('resize', fit);
+  window.addEventListener('focus', poke);
   document.addEventListener('webOSRelaunch', reopened);   // LG: opened again while running
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   document.addEventListener('visibilitychange', function () {
