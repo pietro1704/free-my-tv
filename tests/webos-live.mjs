@@ -31,7 +31,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 try {
   let ready = false;
   for (let i = 0; i < 40; i++) {
-    ready = await evaluate("typeof FreeMyTV !== 'undefined' && document.querySelectorAll('#tiles .tile').length > 0");
+    ready = await evaluate("typeof FreeMyTV !== 'undefined' && !document.hidden && document.querySelectorAll('#tiles .tile').length > 0");
     if (ready) break;
     await wait(250);
   }
@@ -82,10 +82,10 @@ try {
     }
   })()`);
   assert.deepEqual(hidden, {launches: 0, saver: false}, 'Background app must never interrupt playback');
-  await evaluate(`window.__liveCalls = 0; window.__livePalmCall = PalmServiceBridge.prototype.call;
-    PalmServiceBridge.prototype.call = function (uri, payload) {
-      if (uri.indexOf('hbchannel.service/exec') >= 0 && payload.indexOf('MemTotal') >= 0) window.__liveCalls++;
-      return window.__livePalmCall.call(this, uri, payload);
+  await evaluate(`window.__liveCalls = 0; window.__liveRead = TV.readStats;
+    TV.readStats = function (done) {
+      window.__liveCalls++;
+      return window.__liveRead.call(TV, done);
     };
     document.querySelectorAll('#buttons .round')[0].click();`);
   await wait(6500);
@@ -95,7 +95,7 @@ try {
   assert.ok(diagnostics.rows[2].includes('Hz'), 'Panel mode must come from the driver');
   assert.ok(diagnostics.rows[3].includes('Hz'), 'Compositor must be separate from panel mode');
   assert.ok(diagnostics.rows[4].includes('FPS'), 'UI FPS must be measured');
-  assert.ok(diagnostics.calls <= 2, 'Do not poll excessively');
+  assert.equal(diagnostics.calls, 2, 'Observe exactly the initial and second sample');
   await evaluate('FreeMyTV.back()');
   await wait(5500);
   assert.equal(await evaluate('window.__liveCalls'), diagnostics.calls, 'Closing the sheet must stop sampling');
@@ -114,6 +114,6 @@ try {
   console.log(JSON.stringify({pass: true, icons: shelf.actual.length, launchIdentity: true, launchFailure: true,
     backgroundSafe: true, cancellation: true, forecast, diagnostics: diagnostics.rows, frames}, null, 2));
 } finally {
-  await evaluate(`if (window.__livePalmCall) {PalmServiceBridge.prototype.call = window.__livePalmCall; delete window.__livePalmCall; delete window.__liveCalls}`);
+  await evaluate(`if (window.__liveRead) {TV.readStats = window.__liveRead; delete window.__liveRead; delete window.__liveCalls}`);
   socket.close();
 }
