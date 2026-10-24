@@ -253,8 +253,9 @@ var Data = (function () {
 
   /** The installed app for a service key, or null. */
   function appFor(key) {
-    var profileApp = typeof HomeProfile !== 'undefined' && HomeProfile.catalogApp(installed);
-    if (profileApp) return profileApp;
+    if (typeof HomeProfile !== 'undefined' && HomeProfile.config.catalogApp) {
+      return key === 'nuvio' ? HomeProfile.catalogApp(installed) : null;
+    }
     for (var s = 0; s < SERVICES.length; s++) {
       if (SERVICES[s][1] !== key) continue;
       for (var i = 0; i < installed.length; i++) {
@@ -305,7 +306,7 @@ var Data = (function () {
   /** This hour's 3 picks: movies ("movie"), shows ("tv") or both (null). */
   function now(kind) {
     var list = [];
-    if (!KEY) return list;
+    if (!KEY || (CONFIG.homeProfile && CONFIG.homeProfile.providerPicks === false)) return list;
     for (var i = 0; i < picks.length; i++) {
       var p = picks[i];
       if ((kind === null || kind === p.kind) && (!p.detailed || (p.app && appFor(p.app)))) list.push(p);
@@ -479,7 +480,7 @@ var Data = (function () {
 
   /** Fetches the list when stale (6 h, a new period of the day, language, key or apps), then this hour's details. */
   function refreshRecs() {
-    if (!KEY || fetchingRecs || !installed.length) return;
+    if (!KEY || (CONFIG.homeProfile && CONFIG.homeProfile.providerPicks === false) || fetchingRecs || !installed.length) return;
     var t = Date.now(), p = hourPeriod(new Date()), st = sourceStamp();
     if (st === stamp && failedAt && t - failedAt < 10 * 60000 && t >= failedAt) return;
     var stale = st !== stamp || p !== period || t - listAt > 6 * 3600000 || t < listAt || !picks.length || listLang !== I18N.lang;
