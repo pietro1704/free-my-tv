@@ -20,6 +20,8 @@ if [ "$what" = all ] || [ "$what" = android ]; then
 fi
 
 if [ "$what" = all ] || [ "$what" = web ]; then
+  node --test tests/web-profile.test.cjs
+  python3 tests/webapp-config.test.py
   python3 tools/translate.py --check
 
   # The generic LG and Samsung packages land where your own build leaves yours (with your city and TMDB key):

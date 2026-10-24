@@ -31,6 +31,12 @@ var TV = (function () {
       if (done) done(result && result.returnValue !== false ? result : null);
     };
     bridge.call(uri, JSON.stringify(params || {}));
+    return function () {
+      finished = true;
+      if (bridge.cancel) bridge.cancel();
+      var i = calls.indexOf(bridge);
+      if (i >= 0) calls.splice(i, 1);
+    };
   }
 
   // webOS 6 gives Developer Mode apps only the "public" group, which leaves out listLaunchPoints. There the list comes
@@ -150,14 +156,20 @@ var TV = (function () {
   ];
 
   function knownApps(done) {
-    var found = [], left = KNOWN.length, sent = false;
+    var profile = (window.CONFIG || {}).homeProfile, known = profile ? [] : KNOWN.slice();
+    var selected = profile && profile.items || [];
+    for (var k = 0; k < selected.length; k++) {
+      if (!HIDDEN.test(selected[k].id)) known.push([selected[k].id, selected[k].title || selected[k].id]);
+    }
+    var found = [], left = known.length, sent = false;
     function finish() {
       if (sent) return;
       sent = true;
       done(found.filter(function (x) { return x; }));
     }
     setTimeout(finish, 5000);   // an id that never answers doesn't hold the rest
-    KNOWN.forEach(function (k, i) {
+    if (!left) { finish(); return; }
+    known.forEach(function (k, i) {
       luna('luna://com.webos.applicationManager/getAppLoadStatus', {appId: k[0]}, function (res) {
         if (res && res.exist) found[i] = {id: k[0], title: k[1], icon: '', color: ''};
         if (--left === 0) finish();
@@ -277,6 +289,15 @@ var TV = (function () {
   return {
     name: webos ? 'webos' : samsung ? 'tizen' : 'browser',
 
+    /** Rooted LG TVs only. Fixed read-only command; never takes shell text from the UI. */
+    readStats: function (done) {
+      var command = "awk '/^cpu / || /^MemTotal:/ || /^MemAvailable:/ || /^[ \\t]*mode:/ || /^dispFramerate/ {print}' /proc/stat /proc/meminfo /sys/kernel/debug/dri/0/state /proc/lg/ovi/status";
+      if (!webos) { done(null); return null; }
+      return luna('luna://org.webosbrew.hbchannel.service/exec', {command: command}, function (res) {
+        done(res && typeof res.stdoutString === 'string' ? res.stdoutString : null);
+      });
+    },
+
     /** Installed apps, as the TV's launcher lists them: [{id, title, icon, color}]. */
     apps: function (done) {
       if (samsung) { samsungApps(done); return; }
@@ -284,6 +305,9 @@ var TV = (function () {
         done(SAMPLE.map(function (s) { return {id: s[0], title: s[1], icon: '', color: s[2]}; }));
         return;
       }
+      // A focused profile already supplies exact IDs and offline icons. Two availability checks are faster and
+      // more reliable than depending on the remote-control app-list session, which may expire between launches.
+      if ((window.CONFIG || {}).homeProfile) { knownApps(done); return; }
       function list(res) {
         var out = [];
         var points = res && res.launchPoints ? res.launchPoints : [];

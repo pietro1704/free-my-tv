@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import translate  # noqa: E402  (the catalogues and the keys the web app uses)
 
 GENERIC = {'tmdbKey': '', 'tmdbRegion': '', 'latitude': '', 'longitude': '', 'city': '', 'language': 'auto',
-           'currency': '', 'temperature': 'auto', 'showCrypto': True, 'hideAnimation': False, 'hideApps': []}
+           'currency': '', 'temperature': 'auto', 'showCrypto': True, 'hideAnimation': False, 'hideApps': [], 'homeProfile': None}
 
 
 def config_from_args(args):
@@ -46,6 +46,17 @@ def read_config(path):
             sys.exit('config.properties: %s must be a number (got "%s")' % (key, v))
         return v
 
+    profile = None
+    if values.get('home_profile'):
+        profile_path = os.path.join(os.path.dirname(path), values['home_profile'])
+        with open(profile_path, encoding='utf-8') as f:
+            profile = json.load(f)
+        if not isinstance(profile, dict) or not isinstance(profile.get('items'), list):
+            sys.exit('home_profile must contain an items array')
+        for item in profile['items']:
+            if not isinstance(item, dict) or not isinstance(item.get('id'), str) or not item['id'] or item['id'] != item['id'].strip():
+                sys.exit('home_profile items must have exact, nonempty string IDs')
+
     return {
         'tmdbKey': values.get('tmdb_key', ''),
         'tmdbRegion': values.get('tmdb_region', 'US') or 'US',
@@ -58,6 +69,7 @@ def read_config(path):
         'showCrypto': values.get('show_crypto', 'true').lower() != 'false',
         'hideAnimation': values.get('hide_animation', 'false').lower() == 'true',
         'hideApps': [s.strip() for s in values.get('hide_apps', '').split(',') if s.strip()],
+        'homeProfile': profile,
     }
 
 
