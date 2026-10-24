@@ -22,6 +22,7 @@ fi
 if [ "$what" = all ] || [ "$what" = web ]; then
   node --test tests/web-profile.test.cjs
   node --test tests/homelab.test.cjs
+  node --test tests/idle.test.cjs
   python3 tests/webapp-config.test.py
   python3 tools/translate.py --check
 

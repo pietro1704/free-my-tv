@@ -1,0 +1,13 @@
+--- a/apply.sh
++++ b/apply.sh
+@@ -110,2 +110,4 @@
+ cp "$QML_PATH" "$STAGE/qml/main.qml"
++cp "$(dirname "$QML_PATH")/OledIdle.qml" "$STAGE/qml/OledIdle.qml"
++cp "$(dirname "$QML_PATH")/idle.js" "$STAGE/qml/idle.js"
+ chmod 644 "$STAGE/appinfo.json" "$STAGE/qml/main.qml"
+--- a/screensaver-main.qml
++++ b/screensaver-main.qml
+@@ -6,2 +6,3 @@
+     id: window
++    OledIdle { screenSaverVisible: window.visible }
+     width: 1920
