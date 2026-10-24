@@ -543,3 +543,30 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .widget-title { font-size: 28px; font-weight: 600; color: #bbb; }
 .widget-status { font-size: 26px; margin-top: 8px; }
 .widget-detail { font-size: 22px; line-height: 30px; margin-top: 7px; white-space: pre-line; overflow: hidden; }
+
+/* Private four-tab dashboard: videos/media, news, then persistent info widgets. */
+#dashboard { display: none; position: absolute; left: 80px; top: 242px; width: 1760px; height: 335px; }
+.dashboard-home #dashboard { display: block; }
+.dashboard-home #clock, .dashboard-home #cards { display: none; }
+.dashboard-panel { position: absolute; box-sizing: border-box; padding: 28px; text-align: left; border: 2px solid #353539; border-radius: 22px; background: #161618; color: #aaa; overflow: hidden; }
+.dashboard-panel.focus { border-color: #aaa; background: #242426; }
+.dashboard-youtube { left: 0; top: 0; width: 1160px; height: 210px; }
+.dashboard-media { left: 1180px; top: 0; width: 580px; height: 210px; }
+.dashboard-news { left: 0; top: 230px; width: 1760px; height: 105px; padding: 16px 28px; }
+.dashboard-title { font-size: 34px; line-height: 42px; font-weight: 600; color: #bbb; }
+.dashboard-subtitle { font-size: 24px; line-height: 32px; margin-top: 10px; }
+.dashboard-icon { position: absolute; right: 24px; top: 26px; width: 90px; height: 60px; object-fit: contain; }
+.dashboard-news .dashboard-title { font-size: 26px; line-height: 30px; }
+.dashboard-news .dashboard-subtitle { font-size: 22px; line-height: 26px; margin-top: 6px; }
+#dashboard[data-view="news"] .dashboard-news { top: 0; height: 335px; padding-top: 28px; }
+#dashboard[data-view="media"] .dashboard-media { left: 0; width: 1760px; }
+.dashboard-home #home-widgets { top: 600px; height: 185px; }
+.dashboard-home .home-widget { width: 425px; height: 185px; padding: 16px 20px; box-sizing: border-box; }
+.dashboard-home .home-widget + .home-widget { left: 445px; }
+.dashboard-home .home-widget + .home-widget + .home-widget { left: 890px; }
+.dashboard-home .home-widget + .home-widget + .home-widget + .home-widget { left: 1335px; }
+.dashboard-home .widget-title { font-size: 24px; }
+.dashboard-home .widget-status { font-size: 21px; }
+.dashboard-home .widget-detail { font-size: 18px; line-height: 25px; }
+.dashboard-home .widget-status, .dashboard-home .widget-detail { overflow: hidden; text-overflow: ellipsis; }
+.dashboard-home #dashboard[data-view="info"] + #home-widgets { top: 300px; }

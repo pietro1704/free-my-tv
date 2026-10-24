@@ -41,3 +41,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: tools/check.sh web
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Private dashboard browser regression (offline fixtures)
+        run: |
+          python3 webos/build.py --preview --config tests/dashboard.properties
+          CHROMIUM="$(command -v google-chrome)" node tests/dashboard-browser.mjs
+          CHROMIUM="$(command -v google-chrome)" DASHBOARD_LEGACY=1 node tests/dashboard-browser.mjs

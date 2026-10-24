@@ -143,8 +143,11 @@
 
   // MARK: - Focus
 
-  var Z = {TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
+  var dashboardOn = !!HomeProfile.config.dashboard;
+  function tabCount() {return dashboardOn ? 4 : 3;}
+  var dashboardNodes = {};
+  var Z = {DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
+  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
@@ -157,10 +160,12 @@
       setClass(list[i], 'focus', st.zone === Z.TOP && st.top === i);
     }
     list = $('buttons').children;
-    for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.TOP && st.top === 3 + i);
-    setClass($('quotes'), 'hide', st.zone === Z.TOP && st.top >= 3);
+    for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.TOP && st.top === tabCount() + i);
+    setClass($('quotes'), 'hide', st.zone === Z.TOP && st.top >= tabCount());
     list = $('cards').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.CARDS && st.card === i);
+    var dashboardItems = HomeDashboard.items(st.tab);
+    for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) setClass(dashboardNodes[key], 'focus', st.zone === Z.DASHBOARD && dashboardItems[st.dashboard] === key);
     list = $('home-widgets').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.WIDGETS && st.widget === i);
     list = $('tiles').children;
@@ -211,8 +216,8 @@
     $('title').textContent = tr('For You');
     var tabs = $('tabs');
     tabs.innerHTML = '';
-    var names = [tr('Explore'), tr('Movies'), tr('Shows')];
-    for (var i = 0; i < 3; i++) {
+    var names = dashboardOn ? [HomeProfile.labels.youtubeTab || 'YouTube', HomeProfile.labels.newsTab || 'News', HomeProfile.labels.mediaTab || 'Media', HomeProfile.labels.infoTab || 'Info'] : [tr('Explore'), tr('Movies'), tr('Shows')];
+    for (var i = 0; i < names.length; i++) {
       var t = el('button', 'tab', tabs, names[i]);
       hover(t, Z.TOP, i);
     }
@@ -225,7 +230,7 @@
       r.style.left = (1596 + 88 * b) + 'px';
       sym(defs[b][0], r);
       el('div', 'tip', r, defs[b][1]);
-      hover(r, Z.TOP, 3 + b);
+      hover(r, Z.TOP, tabCount() + b);
     }
   }
 
@@ -242,6 +247,7 @@
   // MARK: - Picks and background
 
   function renderCards() {
+    if (dashboardOn) {renderDashboard(); return;}
     var list = Data.picks(TAB_KIND[st.tab]);
     var holder = $('cards');
     setClass(body, 'no-picks', !list.length);
@@ -265,6 +271,36 @@
     if (!list.length && st.zone === Z.CARDS) st.zone = Z.SHELF;
     backdrop(list.length ? Data.image(list[0].backdrop, 'w300') : '');
     updateFocus();
+  }
+
+  function renderDashboard() {
+    var holder = $('dashboard'), labels = HomeProfile.labels;
+    if (!dashboardNodes.youtube) {
+      var sources = ['youtube', 'media', 'news'];
+      for (var i = 0; i < sources.length; i++) {
+        var source = sources[i], panel = el('button', 'dashboard-panel dashboard-' + source, holder);
+        panel.setAttribute('data-panel', source);
+        dashboardNodes[source] = panel;
+        var app = HomeDashboard.app(HomeProfile.config, source);
+        if (app && app.icon) {var icon = el('img', 'dashboard-icon', panel); icon.src = app.icon; icon.alt = '';}
+        el('div', 'dashboard-title', panel, source === 'youtube' ? labels.youtubeTab || 'YouTube' : source === 'media' ? 'Nuvio' : labels.newsTab || 'News');
+        el('div', 'dashboard-subtitle', panel, source === 'youtube' ? labels.youtubePending || 'Subscriptions not connected' : source === 'media' ? labels.mediaPending || 'Open your library in Nuvio' : labels.newsPending || 'News not connected');
+        panel.onclick = (function (key) {return function () {
+          if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf(key) < 0) return;
+          st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf(key); activate();
+        };})(source);
+        panel.onmouseover = (function (key) {return function () {
+          if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf(key) < 0) return;
+          st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf(key); updateFocus();
+        };})(source);
+      }
+    }
+    setClass(body, 'dashboard-home', true);
+    holder.setAttribute('data-view', HomeDashboard.tabs[st.tab]);
+    var visible = HomeDashboard.items(st.tab);
+    for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) dashboardNodes[key].style.display = visible.indexOf(key) >= 0 ? '' : 'none';
+    st.dashboard = Math.max(0, Math.min(st.dashboard, visible.length - 1));
+    cards = []; $('cards').innerHTML = ''; backdrop(''); updateFocus();
   }
 
   var bgUrl = null, bgFront = 'bgA';
@@ -364,6 +400,7 @@
   }
 
   function renderPanels() {
+    renderDashboardWeather();
     var d = $('drawer');
     var old = d.querySelectorAll('.panel');
     for (var o = 0; o < old.length; o++) d.removeChild(old[o]);
@@ -547,7 +584,8 @@
     ].map(function (row) { row.readOnly = true; row.step = function () {}; return row; });
   }
 
-  var widgetsOn = !!HomeProfile.config.homeWidgets, widgetsPaused = false, widgetNodes = [], widgetControl = null;
+  var widgetKinds = dashboardOn ? ['arch', 'weather', 'calendar', 'webosbrew'] : ['arch', 'webosbrew'];
+  var widgetsOn = !!HomeProfile.config.homeWidgets, widgetsPaused = false, widgetNodes = {}, widgetControl = null;
   function syncHomeWidgets() {
     if (widgetControl) widgetControl.sync(!document.hidden && !widgetsPaused && !sheetOpen() && st.zone !== Z.DRAWER);
   }
@@ -556,11 +594,12 @@
     setClass(body, 'home-widgets', true);
     var holder = $('home-widgets'), labels = HomeProfile.labels;
     holder.innerHTML = '';
-    for (var i = 0; i < 2; i++) {
+    for (var i = 0; i < widgetKinds.length; i++) {
       var card = el('button', 'home-widget', holder);
-      card.setAttribute('data-widget', i ? 'webosbrew' : 'arch');
-      el('div', 'widget-title', card, i ? 'webOSbrew' : labels.homelab || 'Homelab · Arch');
-      widgetNodes.push({status: el('div', 'widget-status', card), detail: el('div', 'widget-detail', card)});
+      card.setAttribute('data-widget', widgetKinds[i]);
+      var titles = {arch: labels.homelab || 'Homelab · Arch', webosbrew: 'webOSbrew', weather: labels.weather || 'Weather', calendar: labels.calendar || 'Calendar'};
+      el('div', 'widget-title', card, titles[widgetKinds[i]]);
+      widgetNodes[widgetKinds[i]] = {status: el('div', 'widget-status', card), detail: el('div', 'widget-detail', card)};
       hover(card, Z.WIDGETS, i);
     }
     var readUpdates = BrewUpdates.reader(function (done) { return TV.readBrewApps(done); }, BrewUpdates.repository);
@@ -570,10 +609,25 @@
   function renderHomeWidgets(state) {
     var s = state.lab, b = state.brew, labels = HomeProfile.labels;
     function number(n, unit) {return typeof n === 'number' && isFinite(n) ? Math.round(n) + unit : '—';}
-    widgetNodes[0].status.textContent = s.loading ? labels.waiting || '…' : s.available ? labels.online || 'OK' : labels.offline || '—';
-    widgetNodes[0].detail.textContent = s.available ? 'CPU ' + number(s.cpuPercent, '%') + ' · RAM ' + number(s.usedMB, '') + '/' + number(s.totalMB, ' MB') + '\nDocker ' + number(s.dockerRunning, '') + '/' + number(s.dockerTotal, '') + ' · ' + number(s.temperature, ' °C') : '—';
-    widgetNodes[1].status.textContent = b.loading ? labels.waiting || '…' : !b.available ? labels.offline || '—' : (b.updates.length ? b.updates.length + ' ' + (labels.updates || 'updates') : labels.upToDate || 'OK');
-    widgetNodes[1].detail.textContent = b.available ? b.updates.slice(0, 2).map(function (app) {return app.title + ' · ' + app.installed + ' → ' + app.latest;}).join('\n') || (b.checked + ' ' + (labels.appsChecked || 'apps')) : '—';
+    widgetNodes.arch.status.textContent = s.loading ? labels.waiting || '…' : s.available ? labels.online || 'OK' : labels.offline || '—';
+    widgetNodes.arch.detail.textContent = s.available ? 'CPU ' + number(s.cpuPercent, '%') + ' · RAM ' + number(s.usedMB, '') + '/' + number(s.totalMB, ' MB') + '\nDocker ' + number(s.dockerRunning, '') + '/' + number(s.dockerTotal, '') + ' · ' + number(s.temperature, ' °C') : '—';
+    widgetNodes.webosbrew.status.textContent = b.loading ? labels.waiting || '…' : !b.available ? labels.offline || '—' : (b.updates.length ? b.updates.length + ' ' + (labels.updates || 'updates') : labels.upToDate || 'OK');
+    widgetNodes.webosbrew.detail.textContent = b.available ? b.updates.slice(0, 2).map(function (app) {return app.title + ' · ' + app.installed + ' → ' + app.latest;}).join('\n') || (b.checked + ' ' + (labels.appsChecked || 'apps')) : '—';
+    renderDashboardWeather();
+    if (widgetNodes.calendar) {
+      widgetNodes.calendar.status.textContent = labels.calendarScope || 'Gmail · holidays';
+      widgetNodes.calendar.detail.textContent = labels.calendarPending || 'Calendar not connected';
+    }
+  }
+
+  function renderDashboardWeather() {
+    if (!widgetNodes.weather) return;
+    var days = Data.weather && Data.weather.days || [], labels = HomeProfile.labels;
+    widgetNodes.weather.status.textContent = Data.city || '—';
+    widgetNodes.weather.detail.textContent = days.slice(0, 2).map(function (day, i) {
+      function n(value, suffix) {return typeof value === 'number' && isFinite(value) ? Math.round(value) + suffix : '—';}
+      return (i ? labels.tomorrow || 'Tomorrow' : labels.today || 'Today') + ' · ' + (day.min === null ? '—' : Data.degrees(day.min)) + '–' + (day.max === null ? '—' : Data.degrees(day.max)) + ' · ' + n(day.rain, '%');
+    }).join('\n') || labels.offline || '—';
   }
 
   function openHomelab() {
@@ -827,17 +881,26 @@
   function activate() {
     switch (st.zone) {
       case Z.TOP:
-        if (st.top < 3) return;
-        if (st.top === 3) {
+        if (st.top < tabCount()) return;
+        if (st.top === tabCount()) {
           if (HomeProfile.enabled) openDiagnostics();
           else { var live = liveTV(); if (live) launcher(live.id, tr('Live TV'))(); }
         }
-        else if (st.top === 4) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
+        else if (st.top === tabCount() + 1) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
         else openSettings();
         return;
+      case Z.DASHBOARD:
+        var source = HomeDashboard.items(st.tab)[st.dashboard], target = HomeDashboard.app(HomeProfile.config, source);
+        if (target) launcher(target.id, target.title)();
+        else if (source === 'news' && st.tab !== 1) selectTab(1);
+        else toast(HomeProfile.labels.newsPending || 'News not connected');
+        return;
       case Z.WIDGETS:
-        if (st.widget === 0) openHomelab();
-        else launcher('org.webosbrew.hbchannel', 'webOSbrew')();
+        var kind = widgetKinds[st.widget];
+        if (kind === 'arch') openHomelab();
+        else if (kind === 'webosbrew') launcher('org.webosbrew.hbchannel', 'webOSbrew')();
+        else if (kind === 'weather') {openDrawer();}
+        else if (kind === 'calendar') toast(HomeProfile.labels.calendarPending || 'Calendar not connected');
         return;
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
@@ -883,9 +946,16 @@
         }
         break;
       case Z.WIDGETS:
-        if (dx) st.widget = Math.max(0, Math.min(1, st.widget + dx));
-        else if (dy < 0) {st.zone = cards.length ? Z.CARDS : Z.TOP; st.top = st.tab;}
+        if (dx) st.widget = Math.max(0, Math.min(widgetKinds.length - 1, st.widget + dx));
+        else if (dy < 0) {st.zone = dashboardOn && HomeDashboard.items(st.tab).length ? Z.DASHBOARD : cards.length ? Z.CARDS : Z.TOP; st.dashboard = Math.max(0, HomeDashboard.items(st.tab).length - 1); st.top = st.tab;}
         else if (dy > 0) {st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX($('home-widgets').children[st.widget]));}
+        break;
+      case Z.DASHBOARD:
+        var next = HomeDashboard.next(st.tab, st.dashboard, dx, dy);
+        st.zone = next.zone;
+        if (next.index !== undefined) st.dashboard = next.index;
+        if (st.zone === Z.TOP) st.top = st.tab;
+        if (st.zone === Z.WIDGETS && !widgetsOn) st.zone = Z.SHELF;
         break;
       case Z.CARDS:
         if (dx) st.card = Math.max(0, Math.min(cards.length - 1, st.card + dx));
@@ -895,10 +965,11 @@
         break;
       case Z.TOP:
         if (dx) {
-          st.top = Math.max(0, Math.min(5, st.top + dx));
-          if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
+          st.top = Math.max(0, Math.min(tabCount() + 2, st.top + dx));
+          if (st.top < tabCount()) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
-          if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
+          if (dashboardOn && HomeDashboard.items(st.tab).length) {st.zone = Z.DASHBOARD; st.dashboard = 0;}
+          else if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < tabCount() ? 0 : cards.length - 1); }
           else st.zone = widgetsOn ? Z.WIDGETS : Z.SHELF;
         }
         break;
@@ -946,7 +1017,7 @@
       if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
       if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
       st.zone = zone;
-      if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
+      if (zone === Z.TOP) { st.top = index; if (index < tabCount()) selectTab(index); }
       else if (zone === Z.WIDGETS) st.widget = index;
       else if (zone === Z.CARDS) st.card = index;
       else if (zone === Z.SHELF) st.shelf = index;

@@ -25,7 +25,7 @@ function evaluate(expression) {
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const open = `(function () {
-  FreeMyTV.state.zone = 'top'; FreeMyTV.state.top = 5; FreeMyTV.activate();
+  FreeMyTV.state.zone = 'top'; FreeMyTV.state.top = document.querySelectorAll('#tabs .tab').length + 2; FreeMyTV.activate();
   var rows = document.querySelectorAll('#settings .row');
   for (var i = 0; i < rows.length; i++) if (rows[i].textContent.indexOf(HomeProfile.labels.homelab) === 0) {rows[i].click(); return true}
   return false;
