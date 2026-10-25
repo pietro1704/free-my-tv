@@ -607,16 +607,17 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* Subscription artwork is local and loaded only around the focused video. */
 .dashboard-youtube.has-videos .dashboard-title { position: absolute; left: 20px; top: 10px; font-size: 24px; line-height: 30px; }
+.dashboard-youtube.has-videos { height: 336px; }
 .dashboard-youtube.has-videos .dashboard-subtitle, .dashboard-youtube.has-videos .dashboard-icon { display: none; }
-.video-viewport { position: absolute; left: 18px; right: 18px; top: 48px; height: 134px; overflow: hidden; }
-.video-track { position: relative; height: 130px; }
-.video-card { position: absolute; top: 0; width: 336px; height: 130px; border: 2px solid #333; border-radius: 8px; overflow: hidden; box-sizing: border-box; background: #090909; }
+.video-viewport { position: absolute; left: 18px; right: 18px; top: 48px; height: 264px; overflow: hidden; }
+.video-track { position: relative; height: 260px; }
+.video-card { position: absolute; top: 0; width: 320px; height: 260px; border: 2px solid #333; border-radius: 8px; overflow: hidden; box-sizing: border-box; background: #090909; }
 .video-card.selected { border-color: #ddd; }
-.video-card img { width: 100%; height: 100%; object-fit: cover; }
+.video-art { position: relative; height: 0; padding-top: 56.25%; }
+.video-card img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
 .video-card img.failed { visibility: hidden; }
-.video-shade { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.95)); }
-.video-name { position: absolute; left: 10px; right: 10px; bottom: 26px; font-size: 18px; line-height: 22px; color: #ddd; max-height: 44px; overflow: hidden; }
-.video-channel { position: absolute; left: 10px; right: 10px; bottom: 7px; font-size: 14px; line-height: 17px; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.video-name { margin: 6px 8px 0; height: 48px; font-size: 20px; line-height: 24px; color: #ddd; overflow: hidden; }
+.video-channel { margin: 4px 8px 0; height: 20px; font-size: 16px; line-height: 20px; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .video-duration { position: absolute; right: 8px; top: 6px; background: rgba(0,0,0,0.8); font-size: 14px; color: #bbb; padding: 2px 5px; border-radius: 4px; }
 .video-stamp { position: absolute; left: 20px; bottom: 6px; font-size: 13px; color: #888; }
 
@@ -631,3 +632,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .dashboard-home #dashboard { top: 166px; }
 .dashboard-home #home-widgets { top: 524px; }
 .dashboard-home #dashboard[data-view="info"] + #home-widgets { top: 224px; }
+
+/* The larger video row reserves its own space only while subscriptions are visible. */
+.youtube-artwork #dashboard { height: 461px; }
+.youtube-artwork .dashboard-news { top: 356px; }
+.dashboard-home.youtube-artwork #home-widgets { top: 650px; }
+.youtube-artwork #platter, .youtube-artwork #tiles { -webkit-transform: translateY(126px); transform: translateY(126px); }

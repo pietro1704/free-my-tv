@@ -331,7 +331,7 @@
       setClass(card, 'selected', st.zone === Z.DASHBOARD && HomeDashboard.items(st.tab)[st.dashboard] === 'youtube' && i === st.video);
       if (image && !image.getAttribute('src') && i >= first && i < first + 4 && HomeDashboard.items(st.tab).indexOf('youtube') >= 0) image.src = image.getAttribute('data-src');
     }
-    videoTrack.style.webkitTransform = videoTrack.style.transform = 'translateX(' + (-first * 350) + 'px)';
+    videoTrack.style.webkitTransform = videoTrack.style.transform = 'translateX(' + (-first * 334) + 'px)';
   }
 
   function renderVideos() {
@@ -341,6 +341,7 @@
     if (stamp) panel.removeChild(stamp);
     videoTrack = null; videoItems = YouTubeFeed.items(HomeProfile.config);
     setClass(panel, 'has-videos', videoItems.length > 0);
+    setClass(body, 'youtube-artwork', st.tab === 0 && videoItems.length > 0);
     if (!videoItems.length) {
       panel.querySelector('.dashboard-subtitle').textContent = HomeProfile.config.youtubeFeed ? HomeProfile.labels.youtubeRefresh || 'Inscrições aguardando atualização' : HomeProfile.labels.youtubePending || 'Subscriptions not connected';
       return;
@@ -349,15 +350,15 @@
     videoTrack = el('div', 'video-track', viewport);
     for (var i = 0; i < videoItems.length; i++) {
       var item = videoItems[i], card = el('div', 'video-card', videoTrack);
-      card.style.left = (i * 350) + 'px';
+      card.style.left = (i * 334) + 'px';
+      var artwork = el('div', 'video-art', card);
       if (item.image) {
-        var image = el('img', '', card); image.alt = ''; image.setAttribute('data-src', item.image);
+        var image = el('img', '', artwork); image.alt = ''; image.setAttribute('data-src', item.image);
         image.onerror = function () {setClass(this, 'failed', true);};
       }
-      el('div', 'video-shade', card);
       el('div', 'video-name', card, item.title);
       el('div', 'video-channel', card, item.channel);
-      el('div', 'video-duration', card, item.live ? HomeProfile.labels.youtubeLive || 'Ao vivo' : item.liveCaptured ? HomeProfile.labels.youtubeLiveCaptured || 'Live na captura' : item.duration);
+      el('div', 'video-duration', artwork, item.live ? HomeProfile.labels.youtubeLive || 'Ao vivo' : item.liveCaptured ? HomeProfile.labels.youtubeLiveCaptured || 'Live na captura' : item.duration);
       card.onclick = (function (index) {return function (event) {
         event.stopPropagation();
         if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf('youtube') < 0) return;
