@@ -63,5 +63,39 @@
         "updatedAt": 1
       }
     ]
+  },
+  "calendarKinds": [
+    "primary",
+    "holiday",
+    "moon",
+    "f1"
+  ],
+  "calendarFeed": {
+    "source": "macos_eventkit",
+    "available": true,
+    "timeZone": "America/Sao_Paulo",
+    "generatedAt": "2026-10-25T12:00:00Z",
+    "today": "2026-10-25",
+    "tomorrow": "2026-10-26",
+    "events": [
+      {
+        "id": "fixture-event",
+        "title": "Agenda fixture <img src=x>",
+        "kind": "primary",
+        "start": "2026-10-25T19:00:00Z",
+        "end": "2026-10-25T20:00:00Z",
+        "time": "16:00",
+        "allDay": false
+      },
+      {
+        "id": "fixture-f1",
+        "title": "F1 fixture",
+        "kind": "f1",
+        "start": "2026-10-26T19:00:00Z",
+        "end": "2026-10-26T20:00:00Z",
+        "time": "16:00",
+        "allDay": false
+      }
+    ]
   }
 }

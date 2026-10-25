@@ -374,6 +374,7 @@
   }
 
   function renderClock() {
+    renderCalendarWidget();
     var d = new Date(), c = $('clock');
     c.firstChild.textContent = formatDate('format|h:mm', d.getTime());
     c.lastChild.textContent = formatDate('format|EEEE, MMMM d', d.getTime());
@@ -575,6 +576,7 @@
   // MARK: - Home Settings
 
   var diagnosticsOn = false, diagnosticStats = {}, diagnosticMonitor = Diagnostics.monitor(function (done) { return TV.readStats(done); });
+  var calendarOn = false;
   var homelabOn = false, homelabStats = {}, homelabAt = 0;
   var homelabMonitor = Diagnostics.monitor(function (done) {
     return TV.readHomelab((HomeProfile.config.homelab || {}).host, done);
@@ -583,6 +585,7 @@
   function stopDiagnostics() {
     diagnosticsOn = false;
     homelabOn = false;
+    calendarOn = false;
     diagnosticMonitor.stop();
     homelabMonitor.stop();
     if (frameRequest !== null) window.cancelAnimationFrame(frameRequest);
@@ -660,10 +663,22 @@
     widgetNodes.webosbrew.status.textContent = b.loading ? labels.waiting || '…' : !b.available ? labels.offline || '—' : (b.updates.length ? b.updates.length + ' ' + (labels.updates || 'updates') : labels.upToDate || 'OK');
     widgetNodes.webosbrew.detail.textContent = b.available ? b.updates.slice(0, 2).map(function (app) {return app.title + ' · ' + app.installed + ' → ' + app.latest;}).join('\n') || (b.checked + ' ' + (labels.appsChecked || 'apps')) : '—';
     renderDashboardWeather();
-    if (widgetNodes.calendar) {
-      widgetNodes.calendar.status.textContent = labels.calendarScope || 'Gmail · holidays';
-      widgetNodes.calendar.detail.textContent = labels.calendarPending || 'Calendar not connected';
-    }
+    renderCalendarWidget();
+  }
+
+  function renderCalendarWidget() {
+    if (!widgetNodes || !widgetNodes.calendar) return;
+    var labels = HomeProfile.labels, calendar = CalendarFeed.view(HomeProfile.config);
+    widgetNodes.calendar.status.textContent = labels.calendarScope || 'Gmail · holidays';
+    widgetNodes.calendar.detail.textContent = calendar.available ? calendar.preview.map(function(row){return row.label + ' · ' + row.value;}).join('\n') : calendar.stale ? labels.calendarStale || 'Atualização necessária' : labels.calendarPending || 'Calendar not connected';
+    if (calendarOn && !calendar.available) {closeSheets();st.zone = Z.WIDGETS;st.widget = 2;updateFocus();}
+  }
+
+  function openCalendar() {
+    var calendar = CalendarFeed.view(HomeProfile.config);
+    if (!calendar.available) {toast(calendar.stale ? HomeProfile.labels.calendarStale || 'Atualização necessária' : HomeProfile.labels.calendarPending || 'Calendar not connected');return;}
+    stopDiagnostics(); calendarOn = true; st.zone = Z.SETTINGS; st.row = 0;
+    renderSettings(); setClass($('settings'), 'open', true); updateFocus();
   }
 
   function renderDashboardWeather() {
@@ -712,6 +727,7 @@
   }
 
   function settingRows() {
+    if (calendarOn) return CalendarFeed.view(HomeProfile.config).rows.map(function(row){return {label:row.label,value:row.value,readOnly:true,step:function(){}};});
     if (homelabOn) return homelabRows();
     if (diagnosticsOn) return diagnosticRows();
     var unit = Prefs.temperature(), theme = Prefs.theme();
@@ -763,7 +779,7 @@
     box.innerHTML = '';
     var title = el('div', 'title', box);
     sym('settings', title);
-    title.appendChild(document.createTextNode(homelabOn ? HomeProfile.labels.homelab || 'Homelab' : diagnosticsOn ? 'CPU · RAM · Hz' : tr('Home Settings')));
+    title.appendChild(document.createTextNode(calendarOn ? HomeProfile.labels.calendar || 'Calendário' : homelabOn ? HomeProfile.labels.homelab || 'Homelab' : diagnosticsOn ? 'CPU · RAM · Hz' : tr('Home Settings')));
     var list = el('div', 'list', box), holder = el('div', 'rows', list);
     rowsNow = settingRows();
     list.style.height = Math.min(rowsNow.length, 7) * 78 + 'px';
@@ -778,7 +794,8 @@
       }
       hover(row, Z.SETTINGS, i);
     }
-    el('div', 'hint', box, tr('OK or the arrows change the value.'));
+    el('div', 'hint', box, calendarOn ? HomeProfile.labels.calendarReadOnly || '↑ ↓ · Voltar para fechar' : tr('OK or the arrows change the value.'));
+    setClass($('settings'), 'calendar-sheet', calendarOn);
     updateFocus();
   }
 
@@ -946,7 +963,7 @@
         if (kind === 'arch') openHomelab();
         else if (kind === 'webosbrew') launcher('org.webosbrew.hbchannel', 'webOSbrew')();
         else if (kind === 'weather') {openDrawer();}
-        else if (kind === 'calendar') toast(HomeProfile.labels.calendarPending || 'Calendar not connected');
+        else if (kind === 'calendar') openCalendar();
         return;
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
@@ -1049,6 +1066,7 @@
   }
 
   function back() {
+    if (calendarOn) {closeSheets();st.zone = Z.WIDGETS;st.widget = 2;updateFocus();return;}
     if (diagnosticsOn || homelabOn) { openSettings(); return; }
     if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
     if (st.zone === Z.LANG) { closeLanguages(false); return; }
@@ -1253,7 +1271,7 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
       hideSaver();
-      if (diagnosticsOn || homelabOn) closeSheets();
+      if (diagnosticsOn || homelabOn || calendarOn) closeSheets();
       stopDiagnostics();
       syncHomeWidgets();
       return;
