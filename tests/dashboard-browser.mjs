@@ -213,17 +213,36 @@ try {
   const staleCalendar=await evaluate(`(function(){var previous=CONFIG.homeProfile.calendarFeed.today;try{CONFIG.homeProfile.calendarFeed.today='1999-01-01';FreeMyTV.activate();return FreeMyTV.state.zone}finally{CONFIG.homeProfile.calendarFeed.today=previous}})()`);
   assert.equal(staleCalendar,'widgets','Expired snapshot cannot reopen an old agenda');
 
-  assert.equal(await evaluate("document.querySelectorAll('.news-image').length"),1,'Frank reports must render actual image cards');
+  assert.equal(await evaluate("document.querySelectorAll('.news-card').length"),2,'Ready Frank reports must render as individual cards');
+  assert.equal(await evaluate("document.querySelectorAll('.news-card .news-image').length"),2);
   await wait(200);
-  assert.equal(await evaluate("document.querySelector('.news-image').naturalWidth>0"),true,'Cached image must load without publisher requests');
-  const news=await evaluate(`(function(){FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=2;FreeMyTV.state.news=0;FreeMyTV.move(1,0);var title=document.querySelector('.news-headline').textContent;FreeMyTV.activate();var view=FreeMyTV.state.tab;document.querySelectorAll('#tabs .tab')[0].click();return {title:title,view:view}})()`);
-  assert.deepEqual(news,{title:'News fixture 1',view:1});
-  assert.equal(await evaluate("document.querySelector('.news-meta').textContent.indexOf('Publicação não informada')>=0"),true,'Unknown publication cannot be replaced by analysis time');
-  const pendingNews=await evaluate(`(function(){var feed=CONFIG.homeProfile.newsFeed;try{feed.items.forEach(function(item){item.ready=false});document.querySelectorAll('#tabs .tab')[1].click();return document.querySelectorAll('.news-image').length}finally{feed.items.forEach(function(item){item.ready=true});document.querySelectorAll('#tabs .tab')[0].click()}})()`);
-  assert.equal(pendingNews,0,'Incomplete evidence removes previously displayed report artwork');
-  const noNewsImage=await evaluate(`(function(){var item=CONFIG.homeProfile.newsFeed.items[0],image=item.image;try{item.image='';document.querySelectorAll('#tabs .tab')[1].click();return document.querySelector('.news-headline').getBoundingClientRect().left-document.querySelector('.dashboard-news').getBoundingClientRect().left}finally{item.image=image;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
-  assert.ok(noNewsImage<40,'Missing cached image must not leave a blank half-width column');
-
+  assert.equal(await evaluate("document.querySelector('.news-image').naturalWidth>0"),true,'Cached news photos must decode offline');
+  const newsCarousel=await evaluate(`(async function(){var feed=CONFIG.homeProfile.newsFeed,original=feed.items.slice();try{
+    for(var i=0;i<4;i++){var row={};Object.keys(original[0]).forEach(function(k){row[k]=original[0][k]});row.id='extra-news-'+i;row.title='Extra news '+i;feed.items.push(row)}
+    document.querySelectorAll('#tabs .tab')[1].click();FreeMyTV.state.zone='top';FreeMyTV.state.top=1;FreeMyTV.state.news=0;FreeMyTV.move(0,1);for(var step=0;step<5;step++)FreeMyTV.move(1,0);await new Promise(function(resolve){setTimeout(resolve,200)});
+    var card=document.querySelector('.news-card.selected').getBoundingClientRect(),viewport=document.querySelector('.news-viewport').getBoundingClientRect();FreeMyTV.activate();return {inside:card.left>=viewport.left&&card.right<=viewport.right&&card.top>=viewport.top&&card.bottom<=viewport.bottom,title:document.querySelector('.report-headline').textContent};
+  }finally{FreeMyTV.back();feed.items=original;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.deepEqual(newsCarousel,{inside:true,title:'Extra news 3'},'The last news card must remain visible and open the matching report');
+  await evaluate("FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=2;FreeMyTV.state.news=0;FreeMyTV.move(1,0)");
+  assert.equal(await evaluate("document.querySelector('.news-card.selected .news-headline').textContent"),'News fixture 1');
+  assert.equal(await evaluate("document.querySelector('.news-card.selected .news-meta').textContent.indexOf('Publicação não informada')>=0"),true);
+  await evaluate("FreeMyTV.activate()");
+  assert.equal(await evaluate("FreeMyTV.state.zone"),'report','OK must open the selected saved report');
+  assert.equal(await evaluate("document.getElementById('news-report').textContent.indexOf('News summary fixture 1')>=0"),true);
+  const reportGuard=await evaluate("(function(){var before=window.__launches.length;document.querySelector('.video-card').click();return {same:FreeMyTV.state.zone==='report',noLaunch:window.__launches.length===before}})()");
+  assert.deepEqual(reportGuard,{same:true,noLaunch:true},'An open report must block artwork behind it');
+  await evaluate("FreeMyTV.back()");
+  assert.equal(await evaluate("FreeMyTV.state.zone==='dashboard'&&FreeMyTV.state.news===1"),true,'Back restores the same news selection');
+  await evaluate("FreeMyTV.move(-1,0);FreeMyTV.activate()");
+  assert.equal(await evaluate("document.getElementById('news-report').textContent.indexOf('needs_more_evidence')>=0&&document.getElementById('news-report').textContent.indexOf('not_checkable')>=0&&document.getElementById('news-report').textContent.indexOf('Análise com limitações')>=0"),true,'Frank uncertainty and degraded analysis must stay explicit');
+  await evaluate("FreeMyTV.move(0,1)");
+  assert.equal(await evaluate("document.querySelector('.report-scroll').scrollTop>0"),true,'Remote arrows must scroll long saved reports');
+  const withdrawnReport=await evaluate(`(function(){var row=CONFIG.homeProfile.newsFeed.items[0];try{row.ready=false;FreeMyTV.move(0,1);return {closed:FreeMyTV.state.zone!=='report',empty:document.getElementById('news-report').textContent===''}}finally{row.ready=true;document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.deepEqual(withdrawnReport,{closed:true,empty:true},'Readiness withdrawn during reading must dismiss and clear the old report');
+  const missingNews=await evaluate(`(function(){var feed=CONFIG.homeProfile.newsFeed;try{feed.items.forEach(function(x){x.ready=false});document.querySelectorAll('#tabs .tab')[1].click();return {cards:document.querySelectorAll('.news-card').length,reader:getComputedStyle(document.getElementById('news-report')).visibility}}finally{feed.items.forEach(function(x){x.ready=true});document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.equal(missingNews.cards,0,'Pending evidence removes cached report cards');
+  const noNewsImage=await evaluate(`(function(){var row=CONFIG.homeProfile.newsFeed.items[0],image=row.image;try{row.image='';document.querySelectorAll('#tabs .tab')[1].click();var card=document.querySelector('.news-card');return card.querySelector('.news-headline').getBoundingClientRect().left-card.getBoundingClientRect().left}finally{row.image=image;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.ok(noNewsImage<40,'Missing image must retain a readable headline without a blank image column');
 
   assert.equal(await evaluate("document.querySelectorAll('.video-card').length"),3,'YouTube subscriptions must render image cards');
   const videoLayout=await evaluate(`(function(){var card=document.querySelector('.video-card'),image=card.querySelector('img').getBoundingClientRect(),name=card.querySelector('.video-name').getBoundingClientRect(),channel=card.querySelector('.video-channel').getBoundingClientRect(),viewport=document.querySelector('.video-viewport').getBoundingClientRect(),shelf=document.getElementById('platter').getBoundingClientRect();return {ratio:Math.round(image.width/image.height*1000),titleBelow:name.top>=image.bottom,channelBelow:channel.top>=name.bottom,inside:channel.bottom<=viewport.bottom,screen:shelf.bottom<=1080}})()`);
