@@ -38,13 +38,22 @@ try {
     const result = await call('Runtime.evaluate', {expression, returnByValue:true, awaitPromise:true});
     assert.equal(result.exceptionDetails, undefined, 'Dashboard threw a JavaScript exception'); return result.result.value;
   }
+  await call('Emulation.setTimezoneOverride',{timezoneId:'America/Sao_Paulo'});
   await call('Page.enable'); await call('Runtime.enable'); await call('Network.enable');
   await call('Network.setBlockedURLs', {urls:['http://*', 'https://*']});
   await call('Emulation.setDeviceMetricsOverride', {width:1920,height:1080,deviceScaleFactor:1,mobile:false});
   await call('Page.addScriptToEvaluateOnNewDocument', {source:`
-    if (${!!process.env.DASHBOARD_LEGACY}) {
-      Object.defineProperty(window,'CONFIG',{configurable:true,get:function(){return window.__config;},set:function(value){if(value.homeProfile)value.homeProfile.dashboard=false;window.__config=value;}});
-    }
+    Object.defineProperty(window,'CONFIG',{configurable:true,get:function(){return window.__config;},set:function(value){
+      var profile=value.homeProfile,feed=profile&&profile.calendarFeed;
+      if (${!!process.env.DASHBOARD_LEGACY} && profile) profile.dashboard=false;
+      if(feed){
+        function key(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+        var today=new Date(),tomorrow=new Date();tomorrow.setDate(today.getDate()+1);
+        feed.today=key(today);feed.tomorrow=key(tomorrow);feed.generatedAt=new Date().toISOString();
+        feed.events.forEach(function(event,i){var start=new Date(i?tomorrow:today);start.setHours(16,0,0,0);event.start=start.toISOString();event.end=new Date(start.getTime()+3600000).toISOString()});
+      }
+      window.__config=value;
+    }});
     window.__launches=[]; window.__failLaunch=false;
     window.PalmServiceBridge=function(){
       this.cancel=function(){};
@@ -117,6 +126,15 @@ try {
   const disconnected=await evaluate(`(function(){var feed=CONFIG.homeProfile.mediaFeed;try{CONFIG.homeProfile.mediaFeed=null;document.querySelectorAll('#tabs .tab')[2].click();return document.querySelectorAll('.media-card').length}finally{CONFIG.homeProfile.mediaFeed=feed;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
   assert.equal(disconnected,0,'Disconnected feed cannot retain stale artwork');
 
+  assert.equal(await evaluate("document.querySelector('[data-widget=calendar]').textContent.indexOf('Agenda fixture')>=0"),true,'Calendar must show personal snapshot titles');
+  await evaluate("FreeMyTV.state.zone='widgets';FreeMyTV.state.widget=2;FreeMyTV.activate()");
+  assert.equal(await evaluate("document.getElementById('settings').textContent.indexOf('F1 fixture')>=0"),true,'Calendar must open today/tomorrow titles and times');
+  assert.equal(await evaluate("document.querySelectorAll('#settings .row img').length"),0,'Calendar titles must never become HTML');
+  await evaluate('FreeMyTV.back()');
+  assert.equal(await evaluate("FreeMyTV.state.zone"),'widgets','Back restores calendar focus');
+  const staleCalendar=await evaluate(`(function(){var previous=CONFIG.homeProfile.calendarFeed.today;try{CONFIG.homeProfile.calendarFeed.today='1999-01-01';FreeMyTV.activate();return FreeMyTV.state.zone}finally{CONFIG.homeProfile.calendarFeed.today=previous}})()`);
+  assert.equal(staleCalendar,'widgets','Expired snapshot cannot reopen an old agenda');
+
   const cancellation=await evaluate(`(function(){
     var old=TV.launch,oldDismiss=TV.dismissScreensaver,pending=[],dismissed=0;
     try {
@@ -138,7 +156,7 @@ try {
   const overflow = await evaluate("Array.prototype.some.call(document.querySelectorAll('#dashboard .dashboard-subtitle'),function(x){return x.clientWidth>0 && (x.scrollWidth>x.clientWidth || x.getBoundingClientRect().right>x.parentNode.getBoundingClientRect().right)})");
   assert.equal(overflow,false,'Panel subtitles must wrap within their card');
   if(process.env.DASHBOARD_SCREENSHOT){await evaluate("Prefs.set('theme','dark');Data.settingsChanged();document.getElementById('toast').className=''");await wait(2300);const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.DASHBOARD_SCREENSHOT,Buffer.from(shot.data,'base64'));}
-  console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,unconnectedFeedsExplicit:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,oledPolicyPreserved:true}));
+  console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,unconnectedFeedsExplicit:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,personalCalendar:true,calendarStaleGuard:true,oledPolicyPreserved:true}));
   }
 } finally {
   // Let Chrome flush and stop its helpers before deleting their profile, including on Linux CI.

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>io.freemytv.local-calendar-bridge</string>
+<key>CFBundleExecutable</key><string>TVCalendarBridge</string>
+<key>CFBundleName</key><string>TV Calendar Bridge</string>
+<key>CFBundleVersion</key><string>2</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>LSUIElement</key><true/>
+<key>NSCalendarsFullAccessUsageDescription</key><string>Mostrar na sua TV somente títulos e horários dos calendários selecionados para hoje e amanhã. Nenhum evento será alterado.</string>
+<key>NSCalendarsUsageDescription</key><string>Ler os calendários selecionados para a sua TV, sem alterar eventos.</string>
+</dict></plist>

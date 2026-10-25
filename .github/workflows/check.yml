@@ -49,3 +49,10 @@ jobs:
           python3 webos/build.py --preview --config tests/dashboard.properties
           CHROMIUM="$(command -v google-chrome)" node tests/dashboard-browser.mjs
           CHROMIUM="$(command -v google-chrome)" DASHBOARD_LEGACY=1 node tests/dashboard-browser.mjs
+
+  calendar:
+    name: macOS calendar exporter
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - run: tools/check-calendar.sh

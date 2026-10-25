@@ -586,3 +586,6 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .media-section { position: absolute; left: 8px; top: 6px; background: rgba(0,0,0,0.8); font-size: 15px; color: #bbb; padding: 2px 5px; border-radius: 4px; }
 .media-progress { position: absolute; left: 0; bottom: 0; height: 3px; background: #bbb; }
 .media-stamp { position: absolute; left: 20px; bottom: 6px; font-size: 13px; color: #888; }
+
+/* Calendar rows are read-only and retain room for a two-line event title. */
+.calendar-sheet .row .value { max-width: 680px; overflow: hidden; text-overflow: ellipsis; }
