@@ -80,7 +80,7 @@
     "events": [
       {
         "id": "fixture-event",
-        "title": "Agenda fixture <img src=x>",
+        "title": "Agenda fixture <img src=x> Long event title Long event title Long event title Long event title Long event title Long event title Long event title Long event title ",
         "kind": "primary",
         "start": "2026-10-25T19:00:00Z",
         "end": "2026-10-25T20:00:00Z",

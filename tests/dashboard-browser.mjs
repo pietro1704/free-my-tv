@@ -130,6 +130,11 @@ try {
   await evaluate("FreeMyTV.state.zone='widgets';FreeMyTV.state.widget=2;FreeMyTV.activate()");
   assert.equal(await evaluate("document.getElementById('settings').textContent.indexOf('F1 fixture')>=0"),true,'Calendar must open today/tomorrow titles and times');
   assert.equal(await evaluate("document.querySelectorAll('#settings .row img').length"),0,'Calendar titles must never become HTML');
+  const calendarGeometry=await evaluate(`(function(){var row=document.querySelector('#settings .row'),value=row.querySelector('.value').getBoundingClientRect(),range=document.createRange();range.selectNodeContents(row.firstChild);var label=range.getBoundingClientRect(),bounds=row.getBoundingClientRect();return {separate:value.top>=label.bottom,inside:value.right<=bounds.right&&value.bottom<=bounds.bottom}})()`);
+  assert.deepEqual(calendarGeometry,{separate:true,inside:true},'Event title and time must not overlap or escape the row');
+  await evaluate('FreeMyTV.activate()');
+  assert.equal(await evaluate("document.getElementById('toast').textContent.indexOf('Long event title')>=0"),true,'OK reveals a long calendar title');
+
   await evaluate('FreeMyTV.back()');
   assert.equal(await evaluate("FreeMyTV.state.zone"),'widgets','Back restores calendar focus');
   const staleCalendar=await evaluate(`(function(){var previous=CONFIG.homeProfile.calendarFeed.today;try{CONFIG.homeProfile.calendarFeed.today='1999-01-01';FreeMyTV.activate();return FreeMyTV.state.zone}finally{CONFIG.homeProfile.calendarFeed.today=previous}})()`);

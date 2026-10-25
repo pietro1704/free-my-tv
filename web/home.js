@@ -727,7 +727,7 @@
   }
 
   function settingRows() {
-    if (calendarOn) return CalendarFeed.view(HomeProfile.config).rows.map(function(row){return {label:row.label,value:row.value,readOnly:true,step:function(){}};});
+    if (calendarOn) return CalendarFeed.view(HomeProfile.config).rows.map(function(row){return {label:row.label,value:row.value,readOnly:true,step:function(){toast(row.value);}};});
     if (homelabOn) return homelabRows();
     if (diagnosticsOn) return diagnosticRows();
     var unit = Prefs.temperature(), theme = Prefs.theme();
@@ -794,7 +794,7 @@
       }
       hover(row, Z.SETTINGS, i);
     }
-    el('div', 'hint', box, calendarOn ? HomeProfile.labels.calendarReadOnly || '↑ ↓ · Voltar para fechar' : tr('OK or the arrows change the value.'));
+    el('div', 'hint', box, calendarOn ? HomeProfile.labels.calendarReadOnly || '↑ ↓ · OK: título completo · Voltar'  : tr('OK or the arrows change the value.'));
     setClass($('settings'), 'calendar-sheet', calendarOn);
     updateFocus();
   }
