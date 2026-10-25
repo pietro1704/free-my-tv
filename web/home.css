@@ -573,7 +573,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* Bounded, still artwork carousel; selected cards retain their title on image failure. */
 .dashboard-media.has-media { padding-top: 12px; }
-.dashboard-media.has-media .dashboard-title { font-size: 24px; line-height: 30px; }
+.dashboard-media.has-media .dashboard-title { position: absolute; left: 20px; top: 10px; font-size: 24px; line-height: 30px; }
 .dashboard-media.has-media .dashboard-subtitle, .dashboard-media.has-media .dashboard-icon { display: none; }
 .media-viewport { position: absolute; left: 18px; right: 18px; top: 48px; height: 134px; overflow: hidden; }
 .media-track { position: relative; width: 100%; height: 130px; }

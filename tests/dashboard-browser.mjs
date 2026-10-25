@@ -100,6 +100,7 @@ try {
   assert.equal(await evaluate('CONFIG.homeProfile.idleMinutes'),0.25);
   assert.equal(await evaluate("document.querySelectorAll('.media-card').length"),3,'Nuvio snapshot must render image cards');
   assert.equal(await evaluate("document.querySelectorAll('.media-card img').length"),3);
+  assert.equal(await evaluate("document.querySelector('.dashboard-media .dashboard-title').getBoundingClientRect().bottom <= document.querySelector('.media-viewport').getBoundingClientRect().top"),true,'Nuvio heading must stay above its artwork');
   await wait(500);
   assert.equal(await evaluate("document.querySelectorAll('.media-card img.failed').length"),2,'Blocked images must keep title fallback');
   assert.equal(await evaluate("document.querySelectorAll('.media-card img[src]').length"),2,'Only visible artwork and one next card may load');
