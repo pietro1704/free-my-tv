@@ -147,6 +147,7 @@
   function tabCount() {return dashboardOn ? 4 : 3;}
   function topButtonCount() {return dashboardOn ? 1 : 3;}
   var dashboardNodes = {}, mediaItems = [], mediaTrack = null, newsItems = [], videoItems = [], videoTrack = null;
+  var mediaSnapshot = null, videoSnapshot = null, pointerX = null, pointerY = null;
   var Z = {DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
   var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
@@ -169,6 +170,7 @@
     for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) setClass(dashboardNodes[key], 'focus', st.zone === Z.DASHBOARD && dashboardItems[st.dashboard] === key);
     focusMedia();
     focusVideos();
+    renderFocusDetails();
     list = $('home-widgets').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.WIDGETS && st.widget === i);
     list = $('tiles').children;
@@ -278,13 +280,74 @@
     updateFocus();
   }
 
+  function artworkSnapshot(feed) {
+    return feed && Object.prototype.toString.call(feed.items) === '[object Array]' ? {feed:feed,rows:feed.items,count:feed.items.length,observedAt:feed.observedAt} : null;
+  }
+
+  function retainedArtworkIndex(items, previous, index) {
+    for (var i = 0; previous && i < items.length; i++) if (items[i].id === previous.id && items[i].kind === previous.kind) return i;
+    return Math.max(0, Math.min(items.length - 1, index));
+  }
+
+  function focusedArtwork() {
+    if (!dashboardOn || st.zone !== Z.DASHBOARD || saverOn || document.hidden) return null;
+    var source = HomeDashboard.items(st.tab)[st.dashboard], config = HomeProfile.config;
+    if (source !== 'youtube' && source !== 'media') return null;
+    var feed = source === 'youtube' ? config.youtubeFeed : config.mediaFeed, snapshot = source === 'youtube' ? videoSnapshot : mediaSnapshot;
+    if (!feed || !snapshot || snapshot.feed !== feed || snapshot.rows !== feed.items || snapshot.count !== feed.items.length || snapshot.observedAt !== feed.observedAt || !HomeDashboard.app(config, source)) return null;
+    if (source === 'youtube') {
+      var at = Date.parse(feed.observedAt), now = Date.now();
+      if (feed.source !== 'youtube_subscriptions' || feed.available !== true || feed.accountConfirmed !== true || feed.appId !== config.youtubeApp || !isFinite(at) || at > now + 300000 || now - at > 172800000) return null;
+    } else if (config.catalogApp !== 'space.nuvio.webos' || feed.appId !== config.catalogApp) return null;
+    var item = source === 'youtube' ? videoItems[st.video] : mediaItems[st.media];
+    return item ? {source:source,item:item} : null;
+  }
+
+  function renderFocusDetails() {
+    var selected = focusedArtwork(), holder = $('focus-details'), labels = HomeProfile.labels, parts = [];
+    if (!holder) {setClass(body, 'focus-details-on', false);return;}
+    setClass(body, 'focus-details-on', !!selected);
+    if (!selected) {holder.firstChild.textContent = '';holder.lastChild.textContent = '';return;}
+    var item = selected.item;
+    if (selected.source === 'youtube') {
+      if (item.channel) parts.push(item.channel);
+      if (item.live) parts.push(labels.youtubeLive || 'Ao vivo');
+      else if (item.liveCaptured) parts.push(labels.youtubeLiveCaptured || 'Live na captura');
+      else if (item.duration) parts.push(item.duration);
+      if (item.publishedText) parts.push((labels.youtubeCaptured || 'Na captura') + ': ' + item.publishedText);
+    } else {
+      parts.push(item.section === 'continue' ? labels.continueWatching || 'Continue watching' : labels.myList || 'My list');
+      if (item.season !== undefined && item.episode !== undefined) parts.push('T' + item.season + ' · E' + item.episode);
+      if (item.progress !== null) parts.push(item.progress + '%');
+      if (item.episodeTitle) parts.push(item.episodeTitle);
+    }
+    if (holder.firstChild.textContent !== item.title) holder.firstChild.textContent = item.title;
+    var meta = parts.join(' · ');
+    setClass(holder, 'long-details', item.title.length > 180 || meta.length > 200);
+    if (holder.lastChild.textContent !== meta) holder.lastChild.textContent = meta;
+  }
+
+  function pointerMoved(event) {
+    if (event.clientX === pointerX && event.clientY === pointerY) return false;
+    pointerX = event.clientX; pointerY = event.clientY; return true;
+  }
+
+  function artworkHover(card, source, index) {
+    card.onmousemove = function (event) {
+      if (!pointerMoved(event) || saverOn || sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf(source) < 0) return;
+      if (source === 'youtube') st.video = index; else st.media = index;
+      st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf(source); updateFocus();
+    };
+  }
+
   function focusMedia() {
     if (!mediaTrack) return;
     var nodes = mediaTrack.children, width = st.tab === 2 ? 9 : 2, step = st.tab === 2 ? 184 : 270;
     st.media = Math.max(0, Math.min(mediaItems.length - 1, st.media));
     var first = Math.max(0, st.media - width + 1);
+    var selected = focusedArtwork();
     for (var i = 0; i < nodes.length; i++) {
-      setClass(nodes[i], 'selected', st.zone === Z.DASHBOARD && HomeDashboard.items(st.tab)[st.dashboard] === 'media' && i === st.media);
+      setClass(nodes[i], 'selected', !!selected && selected.source === 'media' && i === st.media);
       var image = nodes[i].querySelector('img');
       if (image && !image.getAttribute('src') && i >= first && i <= first + width && HomeDashboard.items(st.tab).indexOf('media') >= 0) image.src = image.getAttribute('data-src');
     }
@@ -296,7 +359,11 @@
     if (old) panel.removeChild(old);
     var stamp = panel.querySelector('.media-stamp');
     if (stamp) panel.removeChild(stamp);
+    var previous = mediaItems[st.media];
     mediaTrack = null; mediaItems = MediaCards.items(HomeProfile.config);
+    st.media = retainedArtworkIndex(mediaItems, previous, st.media);
+    var feed = HomeProfile.config.mediaFeed;
+    mediaSnapshot = artworkSnapshot(feed);
     setClass(panel, 'has-media', mediaItems.length > 0);
     setClass(body, 'media-artwork', mediaItems.length > 0 && (st.tab === 0 || st.tab === 2));
     if (!mediaItems.length) return;
@@ -304,6 +371,7 @@
     mediaTrack = el('div', 'media-track', viewport);
     for (var i = 0; i < mediaItems.length; i++) {
       var item = mediaItems[i], card = el('div', 'media-card', mediaTrack);
+      artworkHover(card, 'media', i);
       card.style.left = (i * (st.tab === 2 ? 184 : 270)) + 'px';
       var artwork = el('div', 'media-art', card), source = st.tab === 2 ? item.image || item.background : item.background || item.image;
       setClass(artwork, 'poster-fallback', st.tab !== 2 && !item.background);
@@ -335,9 +403,10 @@
     if (!videoTrack) return;
     st.video = Math.max(0, Math.min(videoItems.length - 1, st.video));
     var first = Math.max(0, st.video - 2);
+    var selected = focusedArtwork();
     for (var i = 0; i < videoTrack.children.length; i++) {
       var card = videoTrack.children[i], image = card.querySelector('img');
-      setClass(card, 'selected', st.zone === Z.DASHBOARD && HomeDashboard.items(st.tab)[st.dashboard] === 'youtube' && i === st.video);
+      setClass(card, 'selected', !!selected && selected.source === 'youtube' && i === st.video);
       if (image && !image.getAttribute('src') && i >= first && i < first + 4 && HomeDashboard.items(st.tab).indexOf('youtube') >= 0) image.src = image.getAttribute('data-src');
     }
     videoTrack.style.webkitTransform = videoTrack.style.transform = 'translateX(' + (-first * 334) + 'px)';
@@ -348,7 +417,11 @@
     if (old) panel.removeChild(old);
     var stamp = panel.querySelector('.video-stamp');
     if (stamp) panel.removeChild(stamp);
+    var previous = videoItems[st.video];
     videoTrack = null; videoItems = YouTubeFeed.items(HomeProfile.config);
+    st.video = retainedArtworkIndex(videoItems, previous, st.video);
+    var feed = HomeProfile.config.youtubeFeed;
+    videoSnapshot = artworkSnapshot(feed);
     setClass(panel, 'has-videos', videoItems.length > 0);
     setClass(body, 'youtube-artwork', st.tab === 0 && videoItems.length > 0);
     if (!videoItems.length) {
@@ -359,6 +432,7 @@
     videoTrack = el('div', 'video-track', viewport);
     for (var i = 0; i < videoItems.length; i++) {
       var item = videoItems[i], card = el('div', 'video-card', videoTrack);
+      artworkHover(card, 'youtube', i);
       card.style.left = (i * 334) + 'px';
       var artwork = el('div', 'video-art', card);
       if (item.image) {
@@ -416,8 +490,8 @@
           if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf(key) < 0) return;
           st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf(key); activate();
         };})(source);
-        panel.onmouseover = (function (key) {return function () {
-          if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf(key) < 0) return;
+        panel.onmousemove = (function (key) {return function (event) {
+          if (!pointerMoved(event) || saverOn || sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf(key) < 0) return;
           st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf(key); updateFocus();
         };})(source);
       }
@@ -1049,7 +1123,10 @@
         return;
       case Z.DASHBOARD:
         var source = HomeDashboard.items(st.tab)[st.dashboard], target = HomeDashboard.app(HomeProfile.config, source);
+        var focused = focusedArtwork();
+        if (((source === 'youtube' && videoItems.length) || (source === 'media' && mediaItems.length)) && !focused) {renderDashboard();return;}
         var videoTarget = source === 'youtube' && videoItems.length ? YouTubeFeed.target(HomeProfile.config, st.video) : null;
+        if (videoTarget && videoTarget.params.contentTarget !== 'https://www.youtube.com/watch?v=' + focused.item.id) {renderDashboard();return;}
         if (videoTarget) TV.launch(videoTarget.id, videoTarget.params, function (ok) {if (!ok) toast(trf("Couldn't open {app}.", {app: 'YouTube'}));});
         else if (source === 'youtube' && videoItems.length) {renderVideos();updateFocus();toast(HomeProfile.labels.youtubeRefresh || 'Inscrições aguardando atualização');}
         else if (target) launcher(target.id, target.title)();
@@ -1303,7 +1380,7 @@
     else return;
     e.preventDefault();
   });
-  document.addEventListener('mousemove', function () { poke(); });
+  document.addEventListener('mousemove', function (event) { pointerX = event.clientX; pointerY = event.clientY; poke(); });
 
   // MARK: - Start
 
