@@ -6,12 +6,62 @@
   "idleMinutes": 0.25,
   "youtubeApp": "com.cobalt.youtube.adfree",
   "catalogApp": "space.nuvio.webos",
-  "homelab": {"host": "127.0.0.1"},
+  "homelab": {
+    "host": "127.0.0.1"
+  },
   "items": [
-    {"id": "com.cobalt.youtube.adfree", "title": "YouTube", "icon": "icons/youtube.png"},
-    {"id": "space.nuvio.webos", "title": "Nuvio"},
-    {"id": "com.webos.app.hdmi2", "title": "Receiver"},
-    {"id": "com.webos.app.hdmi3", "title": "PS5"}
+    {
+      "id": "com.cobalt.youtube.adfree",
+      "title": "YouTube",
+      "icon": "icons/youtube.png"
+    },
+    {
+      "id": "space.nuvio.webos",
+      "title": "Nuvio"
+    },
+    {
+      "id": "com.webos.app.hdmi2",
+      "title": "Receiver"
+    },
+    {
+      "id": "com.webos.app.hdmi3",
+      "title": "PS5"
+    }
   ],
-  "labels": {"youtubeTab": "YouTube", "newsTab": "Notícias", "mediaTab": "Mídia", "infoTab": "Infos"}
+  "labels": {
+    "youtubeTab": "YouTube",
+    "newsTab": "Not\u00edcias",
+    "mediaTab": "M\u00eddia",
+    "infoTab": "Infos"
+  },
+  "mediaFeed": {
+    "appId": "space.nuvio.webos",
+    "observedAt": "2026-10-25T12:00:00Z",
+    "items": [
+      {
+        "id": "fixture-0",
+        "title": "Fixture title 0",
+        "kind": "movie",
+        "section": "library",
+        "image": "https://image.tmdb.org/t/p/w500/fixture.jpg",
+        "updatedAt": 3
+      },
+      {
+        "id": "fixture-1",
+        "title": "Fixture title 1",
+        "kind": "movie",
+        "section": "library",
+        "image": "https://image.tmdb.org/t/p/w500/fixture.jpg",
+        "updatedAt": 2
+      },
+      {
+        "id": "fixture-2",
+        "title": "<img src=x onerror=bad()>",
+        "kind": "movie",
+        "section": "library",
+        "image": "https://image.tmdb.org/t/p/w500/fixture.jpg",
+        "updatedAt": 1
+      }
+    ]
+  }
 }

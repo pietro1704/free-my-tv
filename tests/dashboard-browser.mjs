@@ -98,6 +98,25 @@ try {
   await evaluate("FreeMyTV.back();FreeMyTV.back();document.querySelectorAll('#tabs .tab')[0].click()");
   assert.equal(await evaluate("document.querySelectorAll('#cards .card').length"),0);
   assert.equal(await evaluate('CONFIG.homeProfile.idleMinutes'),0.25);
+  assert.equal(await evaluate("document.querySelectorAll('.media-card').length"),3,'Nuvio snapshot must render image cards');
+  assert.equal(await evaluate("document.querySelectorAll('.media-card img').length"),3);
+  assert.equal(await evaluate("document.querySelector('.dashboard-media .dashboard-title').getBoundingClientRect().bottom <= document.querySelector('.media-viewport').getBoundingClientRect().top"),true,'Nuvio heading must stay above its artwork');
+  await wait(500);
+  assert.equal(await evaluate("document.querySelectorAll('.media-card img.failed').length"),2,'Blocked images must keep title fallback');
+  assert.equal(await evaluate("document.querySelectorAll('.media-card img[src]').length"),2,'Only visible artwork and one next card may load');
+  assert.equal(await evaluate("document.querySelectorAll('.media-card .media-name img').length"),0,'Titles must never become HTML');
+  const carousel=await evaluate(`(function(){
+    document.querySelectorAll('#tabs .tab')[0].click();FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=1;FreeMyTV.state.media=0;
+    FreeMyTV.move(1,0);var selected=FreeMyTV.state.media;FreeMyTV.move(0,1);var below=HomeDashboard.items(0)[FreeMyTV.state.dashboard];
+    var before=window.__launches.length;document.querySelectorAll('.media-card')[2].click();
+    return {selected:selected,below:below,launches:window.__launches.length-before,last:window.__launches[window.__launches.length-1]};
+  })()`);
+  assert.deepEqual(carousel,{selected:1,below:'news',launches:1,last:'space.nuvio.webos'});
+  const hiddenMedia=await evaluate(`(function(){document.querySelectorAll('#tabs .tab')[1].click();var before=window.__launches.length;document.querySelector('.media-card').click();document.querySelectorAll('#tabs .tab')[0].click();return window.__launches.length-before})()`);
+  assert.equal(hiddenMedia,0,'Hidden artwork cannot launch Nuvio');
+  const disconnected=await evaluate(`(function(){var feed=CONFIG.homeProfile.mediaFeed;try{CONFIG.homeProfile.mediaFeed=null;document.querySelectorAll('#tabs .tab')[2].click();return document.querySelectorAll('.media-card').length}finally{CONFIG.homeProfile.mediaFeed=feed;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.equal(disconnected,0,'Disconnected feed cannot retain stale artwork');
+
   const cancellation=await evaluate(`(function(){
     var old=TV.launch,oldDismiss=TV.dismissScreensaver,pending=[],dismissed=0;
     try {
@@ -119,7 +138,7 @@ try {
   const overflow = await evaluate("Array.prototype.some.call(document.querySelectorAll('#dashboard .dashboard-subtitle'),function(x){return x.clientWidth>0 && (x.scrollWidth>x.clientWidth || x.getBoundingClientRect().right>x.parentNode.getBoundingClientRect().right)})");
   assert.equal(overflow,false,'Panel subtitles must wrap within their card');
   if(process.env.DASHBOARD_SCREENSHOT){await evaluate("Prefs.set('theme','dark');Data.settingsChanged();document.getElementById('toast').className=''");await wait(2300);const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.DASHBOARD_SCREENSHOT,Buffer.from(shot.data,'base64'));}
-  console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,unconnectedFeedsExplicit:true,oledPolicyPreserved:true}));
+  console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,unconnectedFeedsExplicit:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,oledPolicyPreserved:true}));
   }
 } finally {
   // Let Chrome flush and stop its helpers before deleting their profile, including on Linux CI.
