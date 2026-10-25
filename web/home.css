@@ -550,6 +550,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .dashboard-home #clock, .dashboard-home #cards { display: none; }
 .dashboard-panel { position: absolute; box-sizing: border-box; padding: 28px; text-align: left; border: 2px solid #353539; border-radius: 22px; background: #161618; color: #aaa; overflow: hidden; }
 .dashboard-panel.focus { border-color: #aaa; background: #242426; }
+/* Artwork defines the media rows; the heading keeps focus visible even without a feed. */
+.dashboard-youtube, .dashboard-media,
+.dashboard-youtube.focus, .dashboard-media.focus { border-color: transparent; border-radius: 0; background: transparent; }
+.dashboard-youtube.focus .dashboard-title, .dashboard-media.focus .dashboard-title { color: #ddd; text-decoration: underline; }
 .dashboard-youtube { left: 0; top: 0; width: 1160px; height: 210px; }
 .dashboard-media { left: 1180px; top: 0; width: 580px; height: 210px; }
 .dashboard-news { left: 0; top: 230px; width: 1760px; height: 105px; padding: 16px 28px; }
