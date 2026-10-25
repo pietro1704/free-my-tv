@@ -652,3 +652,20 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .youtube-artwork .dashboard-news, .media-artwork .dashboard-news { top: 356px; }
 .dashboard-home.youtube-artwork #home-widgets, .dashboard-home.media-artwork #home-widgets { top: 650px; }
 .youtube-artwork #platter, .youtube-artwork #tiles, .media-artwork #platter, .media-artwork #tiles { -webkit-transform: translateY(126px); transform: translateY(126px); }
+
+/* A small focus lift fits inside reserved gutters instead of cropping the selected artwork. */
+.media-viewport, .video-viewport { top: 44px; height: 272px; }
+.media-track, .video-track { top: 6px; margin-left: 8px; }
+.media-stamp, .video-stamp { bottom: 0; line-height: 16px; }
+.media-card, .video-card { -webkit-transition: -webkit-transform 0.14s; transition: transform 0.14s; }
+.media-card.selected, .video-card.selected { z-index: 1; border-color: #eee; box-shadow: 0 0 0 1px #aaa; -webkit-transform: scale(1.03); transform: scale(1.03); }
+#focus-details { display: none; position: absolute; left: 80px; right: 80px; bottom: 26px; max-height: 210px; padding: 16px 24px; box-sizing: border-box; border: 1px solid #333; border-radius: 16px; background: #111; overflow: hidden; color: #ddd; word-wrap: break-word; }
+.focus-details-on #focus-details { display: block; }
+.focus-details-on #platter, .focus-details-on #tiles { visibility: hidden; }
+#focus-details .focus-title { font-size: 22px; line-height: 26px; font-weight: 600; }
+#focus-details .focus-meta { margin-top: 6px; font-size: 16px; line-height: 20px; color: #aaa; }
+#focus-details.long-details { padding-top: 10px; padding-bottom: 10px; }
+#focus-details.long-details .focus-title { font-size: 20px; line-height: 24px; }
+@media (prefers-reduced-motion: reduce) {
+  .media-card, .video-card { -webkit-transition: none; transition: none; }
+}

@@ -127,6 +127,32 @@ try {
   assert.equal(await evaluate("document.querySelector('.video-card.selected')!==null"),true,'Removing the outer frame must retain selected artwork');
   const emptyMediaFocus=await evaluate(`(function(){var feed=CONFIG.homeProfile.mediaFeed;try{CONFIG.homeProfile.mediaFeed=null;document.querySelectorAll('#tabs .tab')[2].click();FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.move(-1,0);var panel=document.querySelector('[data-panel=media]');return {underline:getComputedStyle(panel.querySelector('.dashboard-title')).textDecorationLine.indexOf('underline')>=0,background:getComputedStyle(panel).backgroundColor,cards:panel.querySelectorAll('.media-card').length}}finally{CONFIG.homeProfile.mediaFeed=feed;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
   assert.deepEqual(emptyMediaFocus,{underline:true,background:'rgba(0, 0, 0, 0)',cards:0},'Disconnected media must retain a visible focus cue without a large highlighted box');
+  await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(0,1)");
+  await wait(200);
+  const focusedVideo=await evaluate(`(function(){var card=document.querySelector('.video-card.selected'),viewport=document.querySelector('.video-viewport').getBoundingClientRect(),r=card.getBoundingClientRect(),details=document.getElementById('focus-details');return {grown:r.width>card.offsetWidth,inside:r.left>=viewport.left&&r.right<=viewport.right&&r.top>=viewport.top&&r.bottom<=viewport.bottom,details:!!details&&getComputedStyle(details).display!=='none'&&details.textContent.indexOf('YouTube fixture 0')>=0,dockHidden:getComputedStyle(document.getElementById('tiles')).visibility==='hidden'}})()`);
+  assert.deepEqual(focusedVideo,{grown:true,inside:true,details:true,dockHidden:true},'Focused artwork must grow without clipping and show its complete details in place of the dock');
+  const focusStampGap=await evaluate("document.querySelector('.video-stamp').getBoundingClientRect().top-document.querySelector('.video-card.selected').getBoundingClientRect().bottom");
+  assert.ok(focusStampGap>=1,'Focus outline must not cover the snapshot timestamp; gap='+focusStampGap);
+  await evaluate("FreeMyTV.move(0,1)");
+  assert.equal(await evaluate("getComputedStyle(document.getElementById('focus-details')).display==='none'&&getComputedStyle(document.getElementById('tiles')).visibility==='visible'"),true,'Leaving media must dismiss details and restore the dock');
+  const pointer=await evaluate("(function(){var r=document.querySelectorAll('.media-card')[1].getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+50}})()");
+  await call('Input.dispatchMouseEvent',{type:'mouseMoved',...pointer});
+  assert.equal(await evaluate("FreeMyTV.state.media===1&&document.querySelector('#focus-details .focus-title').textContent==='Fixture title 1'"),true,'Moving the pointer selects the actual hovered card');
+  await evaluate("FreeMyTV.move(-1,0)");await wait(200);
+  await evaluate(`document.querySelectorAll('.media-card')[1].dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:${pointer.x},clientY:${pointer.y}}))`);
+  assert.equal(await evaluate("FreeMyTV.state.media"),0,'Stationary pointer events must not undo remote selection');
+  assert.equal(await evaluate("document.getElementById('focus-details').textContent.indexOf('T1 · E2 · 25%')>=0&&document.getElementById('focus-details').textContent.indexOf('Episode fixture')>=0"),true,'Nuvio details retain known episode, title and progress');
+  await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:pointer.x+1,y:pointer.y});
+  assert.equal(await evaluate("FreeMyTV.state.media===1&&document.getElementById('focus-details').textContent.indexOf('Episode fixture')<0"),true,'A genuine pointer move can select again and clears the previous episode');
+  await evaluate("document.querySelector('#buttons button').click()");
+  assert.equal(await evaluate("getComputedStyle(document.getElementById('focus-details')).display==='none'&&document.getElementById('focus-details').textContent===''"),true,'Opening controls cancels and clears media details');
+  await evaluate("FreeMyTV.back();document.querySelectorAll('#tabs .tab')[0].click()");
+  const withdrawnDetails=await evaluate(`(function(){var feed=CONFIG.homeProfile.youtubeFeed;try{FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(0,1);feed.accountConfirmed=false;FreeMyTV.move(1,0);var before=window.__launches.length;FreeMyTV.activate();return {hidden:getComputedStyle(document.getElementById('focus-details')).display==='none',empty:document.getElementById('focus-details').textContent==='',noLaunch:window.__launches.length===before}}finally{feed.accountConfirmed=true;document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.deepEqual(withdrawnDetails,{hidden:true,empty:true,noLaunch:true},'Withdrawn account identity cannot retain details or launch stale content');
+  const reorderedSelection=await evaluate(`(function(){var row=CONFIG.homeProfile.youtubeFeed.items[0],rank=row.rank;try{FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.state.video=0;FreeMyTV.move(0,1);row.rank=99;var before=window.__launches.length;FreeMyTV.activate();return {launches:window.__launches.length-before,selected:YouTubeFeed.items(HomeProfile.config)[FreeMyTV.state.video].id}}finally{row.rank=rank;document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.deepEqual(reorderedSelection,{launches:0,selected:'VIDEO000001'},'A reordered feed must preserve the selected identity and refresh before opening a video');
+  const longFocus=await evaluate(`(function(){var row=CONFIG.homeProfile.youtubeFeed.items[0],old={title:row.title,channel:row.channel,publishedText:row.publishedText};try{row.title='<img src=x onerror=bad()> '+new Array(271).join('W');row.channel=new Array(181).join('W');row.publishedText=new Array(81).join('W');document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click();FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.state.video=0;FreeMyTV.move(0,1);var details=document.getElementById('focus-details');return {full:details.querySelector('.focus-title').textContent===row.title.slice(0,300),noHTML:details.querySelectorAll('img').length===0,fits:details.scrollHeight<=details.clientHeight,overflow:details.scrollHeight-details.clientHeight}}finally{row.title=old.title;row.channel=old.channel;row.publishedText=old.publishedText;document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.deepEqual(longFocus,{full:true,noHTML:true,fits:true,overflow:0},'Long untrusted titles and metadata must fit the details strip as plain text');
   assert.deepEqual(await evaluate("Array.prototype.map.call(document.querySelectorAll('#home-widgets button'),function(x){return x.getAttribute('data-widget')})"),['arch','weather','calendar','webosbrew']);
   const navigation=await evaluate(`(function(){FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.state.video=2;FreeMyTV.move(0,1);var order=[FreeMyTV.state.zone];FreeMyTV.move(1,0);order.push(HomeDashboard.items(0)[FreeMyTV.state.dashboard]);FreeMyTV.move(0,1);order.push(HomeDashboard.items(0)[FreeMyTV.state.dashboard]);FreeMyTV.move(0,1);order.push(FreeMyTV.state.zone);FreeMyTV.move(0,1);order.push(FreeMyTV.state.zone);return order})()`);
   assert.deepEqual(navigation,['dashboard','media','news','widgets','shelf']);
@@ -151,10 +177,10 @@ try {
   await evaluate("document.querySelectorAll('#tabs .tab')[2].click()");
   const posterLayout=await evaluate(`(function(){var card=document.querySelector('.media-card'),image=card.querySelector('img').getBoundingClientRect(),viewport=document.querySelector('.media-viewport').getBoundingClientRect(),shelf=document.getElementById('platter').getBoundingClientRect();return {ratio:Math.round(image.width/image.height*1000),inside:card.getBoundingClientRect().bottom<=viewport.bottom,screen:shelf.bottom<=1080}})()`);
   assert.deepEqual(posterLayout,{ratio:667,inside:true,screen:true},'Media tab must show vertical posters without clipping cards or app shortcuts');
-  const posterCarousel=await evaluate(`(function(){var feed=CONFIG.homeProfile.mediaFeed,original=feed.items.slice();try{
+  const posterCarousel=await evaluate(`(async function(){var feed=CONFIG.homeProfile.mediaFeed,original=feed.items.slice();try{
     for(var i=0;i<10;i++)feed.items.push({id:'extra-'+i,title:'Extra poster '+i,kind:'movie',section:'library',updatedAt:0,image:original[0].image});
     document.querySelectorAll('#tabs .tab')[0].click();document.querySelectorAll('#tabs .tab')[2].click();
-    FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.media=0;for(var step=0;step<9;step++)FreeMyTV.move(1,0);
+    FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.media=0;for(var step=0;step<9;step++)FreeMyTV.move(1,0);await new Promise(function(resolve){setTimeout(resolve,200)});
     var card=document.querySelectorAll('.media-card')[9].getBoundingClientRect(),viewport=document.querySelector('.media-viewport').getBoundingClientRect();FreeMyTV.activate();
     return {selected:FreeMyTV.state.media,visible:card.left>=viewport.left&&card.right<=viewport.right,last:window.__launches[window.__launches.length-1],farImageNotLoaded:!document.querySelectorAll('.media-card')[12].querySelector('img').getAttribute('src')};
   }finally{feed.items=original;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
@@ -206,11 +232,11 @@ try {
   assert.deepEqual(videos,{selected:1,id:'com.cobalt.youtube.adfree',params:{contentTarget:'https://www.youtube.com/watch?v=VIDEO000001'}});
   assert.equal(await evaluate("document.querySelectorAll('.video-card img[src]').length"),3);
   assert.equal(await evaluate("document.querySelector('.video-card img').naturalWidth>0"),true,'Subscription artwork loads offline');
-  const videoCarousel=await evaluate(`(function(){var feed=CONFIG.homeProfile.youtubeFeed,original=feed.items.slice();try{
+  const videoCarousel=await evaluate(`(async function(){var feed=CONFIG.homeProfile.youtubeFeed,original=feed.items.slice();try{
     for(var i=4;i<=7;i++)feed.items.push({id:'VIDEO00000'+i,title:'Extra subscription '+i,channel:'Creator',rank:i,image:original[0].image});
     document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click();
     FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.video=0;
-    for(var step=0;step<5;step++)FreeMyTV.move(1,0);
+    for(var step=0;step<5;step++)FreeMyTV.move(1,0);await new Promise(function(resolve){setTimeout(resolve,200)});
     var card=document.querySelectorAll('.video-card')[5].getBoundingClientRect(),viewport=document.querySelector('.video-viewport').getBoundingClientRect();FreeMyTV.activate();
     return {selected:FreeMyTV.state.video,visible:card.left>=viewport.left&&card.right<=viewport.right,params:window.__launchParams[window.__launchParams.length-1]};
   }finally{feed.items=original;document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()}})()`);
@@ -219,7 +245,7 @@ try {
     row.image='';row.title='<img src=x onerror=bad()> '+new Array(30).join('Long title ');row.channel=new Array(30).join('Long channel ');
     document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click();
     var card=document.querySelector('.video-card'),art=card.querySelector('.video-art').getBoundingClientRect(),name=card.querySelector('.video-name').getBoundingClientRect(),channelRect=card.querySelector('.video-channel').getBoundingClientRect();
-    return {reserved:Math.abs(art.width/art.height-16/9)<0.01,titleBelow:name.top>=art.bottom,channelBelow:channelRect.top>=name.bottom,noHTML:card.querySelectorAll('.video-name img').length===0,titleVisible:name.height>0&&name.height<=48,channelInside:channelRect.bottom<=card.getBoundingClientRect().bottom};
+    return {reserved:Math.abs(art.width/art.height-16/9)<0.01,titleBelow:name.top>=art.bottom,channelBelow:channelRect.top>=name.bottom,noHTML:card.querySelectorAll('.video-name img').length===0,titleVisible:name.height>0&&parseFloat(getComputedStyle(card.querySelector('.video-name')).height)<=48,channelInside:channelRect.bottom<=card.getBoundingClientRect().bottom};
   }finally{row.image=image;row.title=title;row.channel=channel;document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()}})()`);
   assert.deepEqual(missingVideoArt,{reserved:true,titleBelow:true,channelBelow:true,noHTML:true,titleVisible:true,channelInside:true},'Missing thumbnails and long untrusted titles must preserve the text layout');
   await evaluate("document.querySelector('.video-card img').src='data:image/png;base64,aGVsbG8='");
