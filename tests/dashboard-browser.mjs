@@ -52,6 +52,7 @@ try {
         feed.today=key(today);feed.tomorrow=key(tomorrow);feed.generatedAt=new Date().toISOString();
         feed.events.forEach(function(event,i){var start=new Date(i?tomorrow:today);start.setHours(16,0,0,0);event.start=start.toISOString();event.end=new Date(start.getTime()+3600000).toISOString()});
       }
+      if(profile&&profile.newsFeed){profile.newsFeed.observedAt=new Date().toISOString();profile.newsFeed.items.forEach(function(item){item.analyzedAt=new Date().toISOString();if(item.publishedAt)item.publishedAt=new Date(Date.now()-3600000).toISOString()});}
       window.__config=value;
     }});
     window.__launches=[]; window.__failLaunch=false;
@@ -140,6 +141,18 @@ try {
   const staleCalendar=await evaluate(`(function(){var previous=CONFIG.homeProfile.calendarFeed.today;try{CONFIG.homeProfile.calendarFeed.today='1999-01-01';FreeMyTV.activate();return FreeMyTV.state.zone}finally{CONFIG.homeProfile.calendarFeed.today=previous}})()`);
   assert.equal(staleCalendar,'widgets','Expired snapshot cannot reopen an old agenda');
 
+  assert.equal(await evaluate("document.querySelectorAll('.news-image').length"),1,'Frank reports must render actual image cards');
+  await wait(200);
+  assert.equal(await evaluate("document.querySelector('.news-image').naturalWidth>0"),true,'Cached image must load without publisher requests');
+  const news=await evaluate(`(function(){FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=2;FreeMyTV.state.news=0;FreeMyTV.move(1,0);var title=document.querySelector('.news-headline').textContent;FreeMyTV.activate();var view=FreeMyTV.state.tab;document.querySelectorAll('#tabs .tab')[0].click();return {title:title,view:view}})()`);
+  assert.deepEqual(news,{title:'News fixture 1',view:1});
+  assert.equal(await evaluate("document.querySelector('.news-meta').textContent.indexOf('Publicação não informada')>=0"),true,'Unknown publication cannot be replaced by analysis time');
+  const pendingNews=await evaluate(`(function(){var feed=CONFIG.homeProfile.newsFeed;try{feed.items.forEach(function(item){item.ready=false});document.querySelectorAll('#tabs .tab')[1].click();return document.querySelectorAll('.news-image').length}finally{feed.items.forEach(function(item){item.ready=true});document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.equal(pendingNews,0,'Incomplete evidence removes previously displayed report artwork');
+  const noNewsImage=await evaluate(`(function(){var item=CONFIG.homeProfile.newsFeed.items[0],image=item.image;try{item.image='';document.querySelectorAll('#tabs .tab')[1].click();return document.querySelector('.news-headline').getBoundingClientRect().left-document.querySelector('.dashboard-news').getBoundingClientRect().left}finally{item.image=image;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.ok(noNewsImage<40,'Missing cached image must not leave a blank half-width column');
+
+
   const cancellation=await evaluate(`(function(){
     var old=TV.launch,oldDismiss=TV.dismissScreensaver,pending=[],dismissed=0;
     try {
@@ -161,7 +174,7 @@ try {
   const overflow = await evaluate("Array.prototype.some.call(document.querySelectorAll('#dashboard .dashboard-subtitle'),function(x){return x.clientWidth>0 && (x.scrollWidth>x.clientWidth || x.getBoundingClientRect().right>x.parentNode.getBoundingClientRect().right)})");
   assert.equal(overflow,false,'Panel subtitles must wrap within their card');
   if(process.env.DASHBOARD_SCREENSHOT){await evaluate("Prefs.set('theme','dark');Data.settingsChanged();document.getElementById('toast').className=''");await wait(2300);const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.DASHBOARD_SCREENSHOT,Buffer.from(shot.data,'base64'));}
-  console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,unconnectedFeedsExplicit:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,personalCalendar:true,calendarStaleGuard:true,oledPolicyPreserved:true}));
+  console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,pendingYouTubeExplicit:true,frankNews:true,cachedNewsImages:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,personalCalendar:true,calendarStaleGuard:true,oledPolicyPreserved:true}));
   }
 } finally {
   // Let Chrome flush and stop its helpers before deleting their profile, including on Linux CI.

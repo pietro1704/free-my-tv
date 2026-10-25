@@ -97,5 +97,35 @@
         "allDay": false
       }
     ]
+  },
+  "newsFeed": {
+    "source": "frank_investigator",
+    "observedAt": "2026-10-25T17:00:00Z",
+    "items": [
+      {
+        "id": "fixture-news-0",
+        "title": "News fixture 0",
+        "summary": "News summary fixture 0",
+        "source": "news.example",
+        "sourceUrl": "https://news.example/article/0",
+        "status": "completed",
+        "ready": true,
+        "publishedAt": "2026-10-25T16:00:00Z",
+        "analyzedAt": "2026-10-25T17:00:00Z",
+        "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kX1cAAAAASUVORK5CYII="
+      },
+      {
+        "id": "fixture-news-1",
+        "title": "News fixture 1",
+        "summary": "News summary fixture 1",
+        "source": "news.example",
+        "sourceUrl": "https://news.example/article/1",
+        "status": "completed",
+        "ready": true,
+        "publishedAt": null,
+        "analyzedAt": "2026-10-25T17:00:00Z",
+        "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kX1cAAAAASUVORK5CYII="
+      }
+    ]
   }
 }
