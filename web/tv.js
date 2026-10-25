@@ -314,6 +314,11 @@ var TV = (function () {
       });
     },
 
+    dismissScreensaver: function () {
+      if (!webos) return;
+      return luna('luna://org.webosbrew.hbchannel.service/exec', {command:NativeSaver.closeCommand}, function () {});
+    },
+
     /** Installed apps, as the TV's launcher lists them: [{id, title, icon, color}]. */
     apps: function (done) {
       if (samsung) { samsungApps(done); return; }
@@ -354,6 +359,13 @@ var TV = (function () {
 
     /** Opens an app (or an input); done(ok). */
     launch: function (id, params, done) {
+      if (webos && id === 'com.webos.app.screensaver' && ((window.CONFIG || {}).homeProfile || {}).nativeScreensaver) {
+        var command = NativeSaver.command(params);
+        if (!command) {if (done) done(false);return;}
+        return luna('luna://org.webosbrew.hbchannel.service/exec', {command:command}, function (res) {
+          if (done) done(!!res && NativeSaver.ok(res.stdoutString));
+        });
+      }
       if (samsung) {
         if (id.indexOf('source:') === 0) samsungSource(id, done);
         else samsungLaunch(id, done);

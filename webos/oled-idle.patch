@@ -9,5 +9,5 @@
 +++ b/screensaver-main.qml
 @@ -6,2 +6,3 @@
      id: window
-+    OledIdle { screenSaverVisible: window.visible }
++    OledIdle { screenSaverVisible: window.visible; onNativeEnded: Qt.quit() }
      width: 1920

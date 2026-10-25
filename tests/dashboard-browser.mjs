@@ -98,6 +98,23 @@ try {
   await evaluate("FreeMyTV.back();FreeMyTV.back();document.querySelectorAll('#tabs .tab')[0].click()");
   assert.equal(await evaluate("document.querySelectorAll('#cards .card').length"),0);
   assert.equal(await evaluate('CONFIG.homeProfile.idleMinutes'),0.25);
+  const cancellation=await evaluate(`(function(){
+    var old=TV.launch,oldDismiss=TV.dismissScreensaver,pending=[],dismissed=0;
+    try {
+      TV.launch=function(id,params,done){pending.push(done)};
+      TV.dismissScreensaver=function(){dismissed++};
+      FreeMyTV.showSaver();
+      window.dispatchEvent(new Event('focus'));
+      pending.shift()(true);
+      var afterFocus=dismissed;
+      FreeMyTV.showSaver();FreeMyTV.showSaver();
+      pending.shift()(true);
+      var afterOld=dismissed;
+      pending.shift()(true);
+      return {afterFocus:afterFocus,afterOld:afterOld};
+    } finally {TV.launch=old;TV.dismissScreensaver=oldDismiss;document.dispatchEvent(new MouseEvent('mousemove'));}
+  })()`);
+  assert.deepEqual(cancellation,{afterFocus:1,afterOld:1},'Input cancels late saver launches and stale attempts cannot close a newer session');
   assert.deepEqual(errors,[]);
   const overflow = await evaluate("Array.prototype.some.call(document.querySelectorAll('#dashboard .dashboard-subtitle'),function(x){return x.clientWidth>0 && (x.scrollWidth>x.clientWidth || x.getBoundingClientRect().right>x.parentNode.getBoundingClientRect().right)})");
   assert.equal(overflow,false,'Panel subtitles must wrap within their card');
