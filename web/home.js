@@ -145,6 +145,7 @@
 
   var dashboardOn = !!HomeProfile.config.dashboard;
   function tabCount() {return dashboardOn ? 4 : 3;}
+  function topButtonCount() {return dashboardOn ? 1 : 3;}
   var dashboardNodes = {}, mediaItems = [], mediaTrack = null, newsItems = [], videoItems = [], videoTrack = null;
   var Z = {DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
   var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
@@ -227,9 +228,11 @@
     buttons.innerHTML = '';
     var defs = [['live_tv', tr('light|Live TV')], ['hdmi', tr('HDMI Inputs')], ['settings', tr('light|Settings')]];
     if (HomeProfile.enabled) defs[0] = ['settings', HomeProfile.labels.diagnostics || 'CPU / RAM / Hz'];
-    for (var b = 0; b < 3; b++) {
-      var r = el('button', 'round' + (b === 2 ? ' last' : ''), buttons);
-      r.style.left = (1596 + 88 * b) + 'px';
+    if (dashboardOn) defs = [['settings', tr('light|Settings')]];
+    for (var b = 0; b < defs.length; b++) {
+      var r = el('button', 'round' + (b === defs.length - 1 ? ' last' : ''), buttons);
+      r.style.left = (dashboardOn ? 1784 : 1596 + 88 * b) + 'px';
+      r.setAttribute('aria-label', defs[b][1]);
       sym(defs[b][0], r);
       el('div', 'tip', r, defs[b][1]);
       hover(r, Z.TOP, tabCount() + b);
@@ -462,16 +465,16 @@
     platter.style.display = n ? '' : 'none';
     platter.style.left = (left - pad) + 'px';
     platter.style.width = (width + 2 * pad) + 'px';
-    platter.style.top = (814 + 126 - th) + 'px';
+    platter.style.top = (814 + 126 - th - (dashboardOn ? 76 : 0)) + 'px';
     platter.style.height = (th + 2 * pad) + 'px';
-    $('quotes').style.right = (1920 - left - width) + 'px';
+    $('quotes').style.right = dashboardOn ? '' : (1920 - left - width) + 'px';
     var tiles = $('tiles');
     tiles.innerHTML = '';
     for (var i = 0; i < n; i++) {
       var t = el('div', 'tile', tiles);
       t.setAttribute('data-app-id', shelf[i].id);
       t.style.left = (left + i * (tw + gap)) + 'px';
-      t.style.top = (854 + 126 - th) + 'px';
+      t.style.top = (854 + 126 - th - (dashboardOn ? 76 : 0)) + 'px';
       t.style.width = tw + 'px';
       t.style.height = th + 'px';
       face(shelf[i], t, wordFit(shelf[i].title, tw, 30));
@@ -640,12 +643,15 @@
     setClass($('shelfedit'), 'open', false);
     setClass($('langpick'), 'open', false);
     langHint = null;
-    st.zone = Z.SHELF;
+    st.zone = settingsReturnTop ? Z.TOP : Z.SHELF;
+    if (settingsReturnTop) st.top = tabCount();
+    settingsReturnTop = false;
     updateFocus();
   }
 
   // MARK: - Home Settings
 
+  var settingsReturnTop = false;
   var diagnosticsOn = false, diagnosticStats = {}, diagnosticMonitor = Diagnostics.monitor(function (done) { return TV.readStats(done); });
   var calendarOn = false;
   var homelabOn = false, homelabStats = {}, homelabAt = 0;
@@ -815,6 +821,11 @@
       {label: tr('Quotes widget'), toggle: Prefs.quotes(),
         step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
     ];
+    if (dashboardOn) {
+      rows.unshift({label: tr('HDMI Inputs'), value: '›', step: function () {
+        closeSheets(); st.zone = Z.SHELF; openDrawer(); st.drawer = 0; updateFocus();
+      }}, {label: HomeProfile.labels.diagnostics || 'CPU / RAM / Hz', value: '›', step: openDiagnostics});
+    }
     var names = ['Bitcoin', 'Ethereum', 'Solana', tr('Dollar'), 'Euro'];
     var count = HomeProfile.config.forex ? 5 : Data.currency === 'BRL' ? 4 : 3;
     for (var i = 0; i < count; i++) {
@@ -827,7 +838,7 @@
     if (!HomeProfile.enabled) rows.push({label: tr('Shelf'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('TV Settings'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
     if (HomeProfile.enabled) {
-      rows.push({label: HomeProfile.labels.diagnostics || 'CPU / RAM / Hz', value: '›',
+      if (!dashboardOn) rows.push({label: HomeProfile.labels.diagnostics || 'CPU / RAM / Hz', value: '›',
         step: function () { openDiagnostics(); }});
       if (HomeProfile.config.homelab) rows.push({label: HomeProfile.labels.homelab || 'Homelab', value: '›', step: openHomelab});
       var tools = HomeProfile.config.tools || [];
@@ -870,7 +881,8 @@
     updateFocus();
   }
 
-  function openSettings() {
+  function openSettings(fromTop) {
+    if (fromTop === true) settingsReturnTop = true;
     stopDiagnostics();
     st.zone = Z.SETTINGS;
     st.row = 0;
@@ -1016,6 +1028,8 @@
     switch (st.zone) {
       case Z.TOP:
         if (st.top < tabCount()) return;
+        if (st.top >= tabCount() + topButtonCount()) return;
+        if (dashboardOn) {openSettings(true);return;}
         if (st.top === tabCount()) {
           if (HomeProfile.enabled) openDiagnostics();
           else { var live = liveTV(); if (live) launcher(live.id, tr('Live TV'))(); }
@@ -1110,7 +1124,7 @@
         break;
       case Z.TOP:
         if (dx) {
-          st.top = Math.max(0, Math.min(tabCount() + 2, st.top + dx));
+          st.top = Math.max(0, Math.min(tabCount() + topButtonCount() - 1, st.top + dx));
           if (st.top < tabCount()) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
           if (dashboardOn && HomeDashboard.items(st.tab).length) {st.zone = Z.DASHBOARD; st.dashboard = 0;}

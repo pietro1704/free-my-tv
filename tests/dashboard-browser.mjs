@@ -84,6 +84,31 @@ try {
     assert.deepEqual(errors,[]);
     console.log('PASS: legacy three-tab home, two widgets, diagnostics and chosen app discovery');
   } else {
+  assert.equal(await evaluate("document.querySelectorAll('#buttons button').length"),1,'Dashboard header must have one controls entry');
+  const header=await evaluate(`(function(){var title=document.getElementById('title').getBoundingClientRect(),tabs=document.getElementById('tabs').getBoundingClientRect(),button=document.querySelector('#buttons button').getBoundingClientRect(),content=document.getElementById('dashboard').getBoundingClientRect();return {compact:title.height<=40,sameRow:Math.abs(title.top-tabs.top)<25,separate:title.right<tabs.left&&tabs.right<button.left,above:Math.max(title.bottom,tabs.bottom,button.bottom)<content.top}})()`);
+  assert.deepEqual(header,{compact:true,sameRow:true,separate:true,above:true});
+  const topNavigation=await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=3;FreeMyTV.move(99,0);FreeMyTV.state.top");
+  assert.equal(topNavigation,4,'Remote must stop at the one visible controls button');
+  await evaluate("document.querySelector('#buttons button').click()");
+  assert.equal(await evaluate("FreeMyTV.state.zone"),'settings');
+  const controlLabels=await evaluate("Array.prototype.map.call(document.querySelectorAll('#settings .row'),function(x){return x.firstChild.textContent})");
+  assert.ok(controlLabels[0].indexOf('HDMI')>=0,'Inputs remain accessible from the central menu');
+  assert.ok(controlLabels[1].indexOf('CPU')>=0,'Diagnostics remain accessible from the central menu');
+  assert.ok(controlLabels.some(x=>/TV/.test(x)),'TV settings remain accessible');
+  await evaluate("FreeMyTV.state.row=1;FreeMyTV.activate()");
+  assert.equal(await evaluate("document.querySelector('#settings .title').textContent"),'CPU · RAM · Hz');
+  await evaluate("FreeMyTV.back();FreeMyTV.back()");
+  assert.equal(await evaluate("FreeMyTV.state.zone==='top'&&FreeMyTV.state.top===4"),true,'Back from diagnostics then controls restores the header button');
+  await evaluate("FreeMyTV.state.top=5;FreeMyTV.activate()");
+  assert.equal(await evaluate("FreeMyTV.state.zone"),'top','Removed header actions cannot be activated by a stale index');
+  await evaluate("FreeMyTV.state.top=4;document.querySelector('#buttons button').click()");
+  const tvSettingsFailure=await evaluate(`(function(){var previous=TV.settings;try{TV.settings=function(done){done(false)};var rows=document.querySelectorAll('#settings .row');for(var i=0;i<rows.length;i++)if(/TV/.test(rows[i].firstChild.textContent)){rows[i].click();break}return document.getElementById('toast').textContent}finally{TV.settings=previous}})()`);
+  assert.ok(tvSettingsFailure.length>0,'TV settings rejection must report a failure');
+  assert.equal(await evaluate("document.querySelectorAll('#settings .row').length>0"),true,'Rejected external settings must leave controls usable');
+  await evaluate("FreeMyTV.back()");
+  await evaluate("document.querySelector('#buttons button').click();FreeMyTV.state.row=0;FreeMyTV.activate()");
+  assert.equal(await evaluate("FreeMyTV.state.zone"),'drawer','HDMI action must open the input drawer');
+  await evaluate("FreeMyTV.back();document.querySelectorAll('#tabs .tab')[0].click()");
   assert.deepEqual(await evaluate("Array.prototype.map.call(document.querySelectorAll('#tabs .tab'),function(x){return x.textContent})"),['YouTube','Notícias','Mídia','Infos']);
   assert.equal(await evaluate('TV.name'), 'webos', 'Browser must exercise the injected webOS bridge');
   const expected = await evaluate('CONFIG.homeProfile.items.map(function(x){return x.id})');
@@ -105,7 +130,7 @@ try {
   await evaluate("window.__failLaunch=true;document.querySelector('[data-panel=media]').click();window.__failLaunch=false");
   assert.equal(await evaluate("document.getElementById('toast').className.indexOf('on')>=0"),true);
   await evaluate("document.querySelectorAll('#tabs .tab')[3].click();FreeMyTV.move(1,0);FreeMyTV.activate()");
-  assert.equal(await evaluate("FreeMyTV.state.zone==='settings'"),true,'Fourth tab must not consume the diagnostics button');
+  assert.equal(await evaluate("FreeMyTV.state.zone==='settings'"),true,'Fourth tab must not consume the controls button');
   await evaluate("FreeMyTV.back();FreeMyTV.back();document.querySelectorAll('#tabs .tab')[0].click()");
   assert.equal(await evaluate("document.querySelectorAll('#cards .card').length"),0);
   assert.equal(await evaluate('CONFIG.homeProfile.idleMinutes'),0.25);
@@ -190,7 +215,7 @@ try {
   const overflow = await evaluate("Array.prototype.some.call(document.querySelectorAll('#dashboard .dashboard-subtitle'),function(x){return x.clientWidth>0 && (x.scrollWidth>x.clientWidth || x.getBoundingClientRect().right>x.parentNode.getBoundingClientRect().right)})");
   assert.equal(overflow,false,'Panel subtitles must wrap within their card');
   if(process.env.DASHBOARD_SCREENSHOT){await evaluate("Prefs.set('theme','dark');Data.settingsChanged();document.getElementById('toast').className=''");await wait(2300);const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.DASHBOARD_SCREENSHOT,Buffer.from(shot.data,'base64'));}
-  console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,youtubeCards:true,youtubeIdentityAndStaleGuard:true,frankNews:true,cachedNewsImages:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,personalCalendar:true,calendarStaleGuard:true,oledPolicyPreserved:true}));
+  console.log(JSON.stringify({pass:true,tabs:4,compactHeader:true,unifiedControls:true,controlsBackFocus:true,removedActionGuard:true,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,youtubeCards:true,youtubeIdentityAndStaleGuard:true,frankNews:true,cachedNewsImages:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,personalCalendar:true,calendarStaleGuard:true,oledPolicyPreserved:true}));
   }
 } finally {
   // Let Chrome flush and stop its helpers before deleting their profile, including on Linux CI.

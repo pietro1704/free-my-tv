@@ -619,3 +619,15 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .video-channel { position: absolute; left: 10px; right: 10px; bottom: 7px; font-size: 14px; line-height: 17px; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .video-duration { position: absolute; right: 8px; top: 6px; background: rgba(0,0,0,0.8); font-size: 14px; color: #bbb; padding: 2px 5px; border-radius: 4px; }
 .video-stamp { position: absolute; left: 20px; bottom: 6px; font-size: 13px; color: #888; }
+
+/* A compact dashboard header leaves one row for navigation, quotes and controls. */
+.dashboard-home #title { left: 80px; top: 66px; font-size: 34px; line-height: 40px; }
+.dashboard-home #tabs { left: 360px; top: 58px; height: 56px; }
+.dashboard-home .tab { height: 56px; line-height: 56px; padding: 0 20px; font-size: 28px; border-radius: 28px; }
+.dashboard-home #quotes { right: 170px; top: 74px; }
+.dashboard-home .round { top: 58px; width: 56px; height: 56px; border-radius: 28px; }
+.dashboard-home .round .sym { left: 14px; top: 14px; }
+.dashboard-home .round .tip { top: 64px; font-size: 21px; }
+.dashboard-home #dashboard { top: 166px; }
+.dashboard-home #home-widgets { top: 524px; }
+.dashboard-home #dashboard[data-view="info"] + #home-widgets { top: 224px; }
