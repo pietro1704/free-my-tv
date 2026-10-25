@@ -11,9 +11,9 @@ function snapshot(storage, observedAt) {
     if (!own(value) || !identity(value) || (kind(value) !== 'movie' && kind(value) !== 'series')) return;
     var title = typeof value.title === 'string' ? value.title : '', key = '$' + kind(value) + ':' + identity(value);
     if (!title) return;
-    var image = value.poster || value.posterUrl || art[key] || '';
+    var saved = art[key] || {}, image = value.poster || value.posterUrl || saved.image || '';
     var output = {id:identity(value).slice(0,200),kind:kind(value),title:title.slice(0,180),section:section,
-      image:artUrl(image),updatedAt:Number(value.updatedAt) || 0};
+      image:artUrl(image),background:artUrl(value.background || saved.background || ''),updatedAt:Number(value.updatedAt) || 0};
     if (section === 'continue') {
       var duration = Number(value.durationMs), position = Number(value.positionMs);
       if (!isFinite(duration) || !isFinite(position) || duration < 0 || position <= 0) return;
@@ -21,11 +21,17 @@ function snapshot(storage, observedAt) {
       if (duration > 0 && position > duration && position / 1000 <= duration) position /= 1000;
       if (duration > 0 && position / duration >= 0.95) return;
       output.positionMs = position; output.durationMs = duration;
+      var season = value.season !== undefined && value.season !== null ? value.season : value.seasonNumber;
+      var episode = value.episode !== undefined && value.episode !== null ? value.episode : value.episodeNumber;
+      if (kind(value) === 'series' && typeof season === 'number' && isFinite(season) && season >= 0 && season <= 10000 && season % 1 === 0 && typeof episode === 'number' && isFinite(episode) && episode > 0 && episode <= 10000 && episode % 1 === 0) {
+        output.season = season; output.episode = episode;
+        if (typeof value.episodeTitle === 'string') output.episodeTitle = value.episodeTitle.slice(0,180);
+      }
     }
     items.push(output);
   }
   if (Object.prototype.toString.call(library) === '[object Array]') for (var i = 0; i < library.length && i < 1000; i++) {
-    if (own(library[i])) art['$' + kind(library[i]) + ':' + identity(library[i])] = library[i].poster || library[i].posterUrl || '';
+    if (own(library[i])) art['$' + kind(library[i]) + ':' + identity(library[i])] = {image:library[i].poster || library[i].posterUrl || '',background:library[i].background || ''};
     row(library[i], 'library');
   }
   if (Object.prototype.toString.call(progress) === '[object Array]') for (var j = 0; j < progress.length && j < 5000; j++) row(progress[j], 'continue');

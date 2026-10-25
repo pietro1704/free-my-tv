@@ -136,10 +136,25 @@ try {
   assert.equal(await evaluate('CONFIG.homeProfile.idleMinutes'),0.25);
   assert.equal(await evaluate("document.querySelectorAll('.media-card').length"),3,'Nuvio snapshot must render image cards');
   assert.equal(await evaluate("document.querySelectorAll('.media-card img').length"),3);
+  const mediaLayout=await evaluate(`(function(){var card=document.querySelector('.media-card'),art=card.querySelector('img').getBoundingClientRect(),title=card.querySelector('.media-name').getBoundingClientRect(),detail=card.querySelector('.media-detail'),progress=card.querySelector('.media-progress');return {ratio:Math.round(art.width/art.height*1000),titleBelow:title.top>=art.bottom,episode:!!detail&&detail.textContent.indexOf('T1 · E2')>=0,progress:!!progress&&Math.abs(progress.getBoundingClientRect().width/card.clientWidth-0.25)<0.01}})()`);
+  assert.deepEqual(mediaLayout,{ratio:1778,titleBelow:true,episode:true,progress:true},'Home Nuvio cards must show landscape art, episode and actual progress');
   assert.equal(await evaluate("document.querySelector('.dashboard-media .dashboard-title').getBoundingClientRect().bottom <= document.querySelector('.media-viewport').getBoundingClientRect().top"),true,'Nuvio heading must stay above its artwork');
   await wait(500);
   assert.equal(await evaluate("document.querySelectorAll('.media-card img.failed').length"),2,'Blocked images must keep title fallback');
-  assert.equal(await evaluate("document.querySelectorAll('.media-card img[src]').length"),2,'Only visible artwork and one next card may load');
+  assert.equal(await evaluate("document.querySelectorAll('.media-card img[src]').length"),3,'Only visible artwork and one next card may load');
+  assert.equal(await evaluate("document.querySelector('.media-card img').naturalWidth>0"),true,'Cached Nuvio artwork must decode offline');
+  await evaluate("document.querySelectorAll('#tabs .tab')[2].click()");
+  const posterLayout=await evaluate(`(function(){var card=document.querySelector('.media-card'),image=card.querySelector('img').getBoundingClientRect(),viewport=document.querySelector('.media-viewport').getBoundingClientRect(),shelf=document.getElementById('platter').getBoundingClientRect();return {ratio:Math.round(image.width/image.height*1000),inside:card.getBoundingClientRect().bottom<=viewport.bottom,screen:shelf.bottom<=1080}})()`);
+  assert.deepEqual(posterLayout,{ratio:667,inside:true,screen:true},'Media tab must show vertical posters without clipping cards or app shortcuts');
+  const posterCarousel=await evaluate(`(function(){var feed=CONFIG.homeProfile.mediaFeed,original=feed.items.slice();try{
+    for(var i=0;i<10;i++)feed.items.push({id:'extra-'+i,title:'Extra poster '+i,kind:'movie',section:'library',updatedAt:0,image:original[0].image});
+    document.querySelectorAll('#tabs .tab')[0].click();document.querySelectorAll('#tabs .tab')[2].click();
+    FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.media=0;for(var step=0;step<9;step++)FreeMyTV.move(1,0);
+    var card=document.querySelectorAll('.media-card')[9].getBoundingClientRect(),viewport=document.querySelector('.media-viewport').getBoundingClientRect();FreeMyTV.activate();
+    return {selected:FreeMyTV.state.media,visible:card.left>=viewport.left&&card.right<=viewport.right,last:window.__launches[window.__launches.length-1],farImageNotLoaded:!document.querySelectorAll('.media-card')[12].querySelector('img').getAttribute('src')};
+  }finally{feed.items=original;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.deepEqual(posterCarousel,{selected:9,visible:true,last:'space.nuvio.webos',farImageNotLoaded:true},'Vertical poster navigation must keep focus visible, launch only Nuvio and defer distant artwork');
+  await evaluate("document.querySelectorAll('#tabs .tab')[0].click()");
   assert.equal(await evaluate("document.querySelectorAll('.media-card .media-name img').length"),0,'Titles must never become HTML');
   const carousel=await evaluate(`(function(){
     document.querySelectorAll('#tabs .tab')[0].click();FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=1;FreeMyTV.state.media=0;

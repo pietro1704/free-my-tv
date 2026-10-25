@@ -12,3 +12,10 @@ test('own progress joins only own library artwork and excludes completion or inv
 test('malformed or unavailable storage fails to empty snapshot without writing accounts',()=>{
  for(const s of [{getItem(){throw Error('unavailable')}},{getItem(){return '{bad'}},store({activeProfileId:{bad:true},savedLibraryItems:{},watchProgressItems:null})])assert.equal(snapshot(s,'now').items.length,0);
 });
+test('episode details and background come only from own series progress and own library artwork',()=>{
+ const bg='https://image.tmdb.org/t/p/w780/bg.jpg';
+ const data=snapshot(store({activeProfileId:'2',savedLibraryItems:[row('1','same',{background:bg}),row('2','own',{background:bg,contentType:'series'})],watchProgressItems:[row('2','own',{contentType:'series',poster:null,season:0,episode:2,episodeTitle:'Special',positionMs:5,durationMs:10}),row('2','same',{contentType:'series',season:1,episode:3,positionMs:5,durationMs:10}),row('2','bad',{contentType:'series',season:1.5,episode:-1,positionMs:5,durationMs:10}),row('2','movie',{season:1,episode:2,positionMs:5,durationMs:10})]}),'now');
+ const own=data.items.find(x=>x.section==='continue'&&x.id==='own');assert.equal(own.background,bg);assert.equal(own.season,0);assert.equal(own.episode,2);assert.equal(own.episodeTitle,'Special');
+ assert.equal(data.items.find(x=>x.id==='same').background,'');
+ for(const id of ['bad','movie']){const item=data.items.find(x=>x.id===id);assert.equal(item.season,undefined);assert.equal(item.episode,undefined);}
+});
