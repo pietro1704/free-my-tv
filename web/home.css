@@ -605,19 +605,35 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .calendar-sheet .box .row { font-size: 18px; line-height: 22px; padding: 9px 24px; box-sizing: border-box; }
 .calendar-sheet .box .row .value { position: static; display: block; max-width: 100%; font-size: 24px; line-height: 28px; overflow: hidden; text-overflow: ellipsis; }
 
-/* Frank report cards use cached photos and keep article and analysis dates distinct. */
+/* News cards retain cached photos, two-line headlines and a separate read-only report. */
+.dashboard-news.has-news { padding: 0; border-color: transparent; border-radius: 0; background: transparent; }
 .dashboard-news.has-news .dashboard-title, .dashboard-news.has-news .dashboard-subtitle { display: none; }
-.news-image { position: absolute; left: 16px; top: 12px; width: 128px; height: 80px; object-fit: cover; border-radius: 8px; }
+.news-viewport { position: absolute; left: 0; right: 0; top: 0; height: 105px; overflow: hidden; }
+.news-track { position: relative; top: 4px; margin-left: 12px; }
+.news-card { position: absolute; top: 0; width: 560px; height: 96px; border: 2px solid #333; border-radius: 10px; background: #121212; overflow: hidden; box-sizing: border-box; -webkit-transition: -webkit-transform 0.14s; transition: transform 0.14s; }
+.news-card.selected { z-index: 1; border-color: #eee; box-shadow: 0 0 0 1px #aaa; -webkit-transform: scale(1.03); transform: scale(1.03); }
+.news-image { position: absolute; left: 8px; top: 6px; width: 144px; height: 81px; object-fit: cover; border-radius: 6px; }
 .news-image.failed { display: none; }
-.news-headline { position: absolute; left: 164px; right: 94px; top: 10px; font-size: 23px; line-height: 29px; color: #ccc; max-height: 58px; overflow: hidden; }
-.news-meta { position: absolute; left: 164px; right: 18px; bottom: 9px; font-size: 16px; line-height: 19px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.news-counter { position: absolute; right: 16px; top: 8px; color: #999; font-size: 17px; }
-.news-summary { display: none; }
-#dashboard[data-view="news"] .news-image { left: 26px; top: 26px; width: 480px; height: 280px; }
-#dashboard[data-view="news"] .news-headline { left: 540px; top: 26px; font-size: 28px; line-height: 34px; max-height: 68px; }
-#dashboard[data-view="news"] .news-summary { display: block; position: absolute; left: 540px; right: 28px; top: 112px; max-height: 152px; overflow: hidden; font-size: 22px; line-height: 29px; color: #aaa; }
-#dashboard[data-view="news"] .news-meta { left: 540px; bottom: 20px; }
-.dashboard-news.news-no-image .news-headline, .dashboard-news.news-no-image .news-meta, #dashboard[data-view="news"] .news-no-image .news-headline, #dashboard[data-view="news"] .news-no-image .news-meta, #dashboard[data-view="news"] .news-no-image .news-summary { left: 26px; }
+.news-headline { position: absolute; left: 164px; right: 12px; top: 7px; height: 44px; overflow: hidden; font-size: 19px; line-height: 22px; color: #ccc; }
+.news-meta { position: absolute; left: 164px; right: 12px; bottom: 8px; height: 18px; font-size: 14px; line-height: 18px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.news-card.no-image .news-headline, .news-card.no-image .news-meta { left: 12px; }
+#dashboard[data-view="news"] .news-viewport { height: 335px; }
+#dashboard[data-view="news"] .news-track { top: 6px; }
+#dashboard[data-view="news"] .news-card { width: 400px; height: 315px; }
+#dashboard[data-view="news"] .news-image { left: 0; top: 0; width: 100%; height: 222.75px; border-radius: 0; }
+#dashboard[data-view="news"] .news-headline { left: 12px; top: 236px; }
+#dashboard[data-view="news"] .news-meta { left: 12px; bottom: 10px; }
+#dashboard[data-view="news"] .news-card.no-image .news-headline { top: 24px; }
+.report-box { position: absolute; left: 160px; right: 160px; top: 70px; bottom: 70px; border: 1px solid #444; border-radius: 20px; background: #111; }
+.report-scroll { position: absolute; left: 32px; right: 32px; top: 30px; bottom: 76px; overflow: auto; word-wrap: break-word; }
+.report-scroll::-webkit-scrollbar { width: 8px; background: #161616; }
+.report-scroll::-webkit-scrollbar-thumb { border-radius: 4px; background: #555; }
+.report-headline { font-size: 30px; line-height: 36px; color: #ddd; font-weight: 600; margin-bottom: 16px; }
+.report-meta, .report-source { font-size: 18px; line-height: 26px; color: #aaa; white-space: pre-wrap; margin: 8px 0; }
+.report-warning, .report-heading { font-size: 22px; line-height: 30px; color: #ddd; font-weight: 600; margin: 24px 0 8px; }
+.report-text { font-size: 22px; line-height: 30px; color: #bbb; white-space: pre-wrap; }
+.report-hint { position: absolute; left: 32px; bottom: 26px; font-size: 18px; color: #aaa; }
+.report-close { position: absolute; right: 32px; bottom: 18px; padding: 8px 22px; font-size: 20px; color: #ddd; border: 1px solid #666; border-radius: 12px; background: #222; }
 
 /* Subscription artwork is local and loaded only around the focused video. */
 .dashboard-youtube.has-videos .dashboard-title { position: absolute; left: 20px; top: 10px; font-size: 24px; line-height: 30px; }
@@ -667,5 +683,5 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #focus-details.long-details { padding-top: 10px; padding-bottom: 10px; }
 #focus-details.long-details .focus-title { font-size: 20px; line-height: 24px; }
 @media (prefers-reduced-motion: reduce) {
-  .media-card, .video-card { -webkit-transition: none; transition: none; }
+  .media-card, .video-card, .news-card { -webkit-transition: none; transition: none; }
 }

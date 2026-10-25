@@ -14,3 +14,12 @@ test('news images are local raster data, never publisher tracking URLs or SVG sc
  const a=api();for(const image of ['https://tracking.example/image.jpg','data:image/svg+xml;base64,aGVsbG8=','javascript:bad()'])assert.equal(a.items(config([row('a',{image})]),now)[0].image,'');
  assert.ok(a.items(config([row('a')]),now)[0].image.startsWith('data:image/png;base64,'));
 });
+test('reader preserves Frank qualifications as bounded text, not arbitrary fields or verdict claims',()=>{
+ const item=api().items(config([row('a',{report:{conclusion:'Conclusion',strengths:['Point',null,{}],weaknesses:['Needs evidence'],quality:'Mixed evidence',verdicts:{supported:2,needs_more_evidence:1,not_checkable:3,pending:-1,secret:99},reused:true,degraded:true,token:'never export'}})]),now)[0];
+ assert.equal(item.sourceUrl,'https://news.example/article/a');assert.equal(item.report.conclusion,'Conclusion');assert.deepEqual(Array.from(item.report.strengths),['Point']);assert.equal(item.report.verdicts.needs_more_evidence,1);assert.equal(item.report.verdicts.not_checkable,3);assert.equal(item.report.verdicts.pending,undefined);assert.equal(item.report.verdicts.secret,undefined);assert.equal(item.report.token,undefined);assert.equal(item.report.degraded,true);
+ const invalid=api().items(config([row('a',{report:'bad'})]),now)[0];assert.equal(invalid.report,null);
+});
+test('reader revalidates report identity and readiness without scanning artwork on every key',()=>{
+ const a=api(),value=row('a');Object.defineProperty(value,'image',{get(){throw Error('Artwork must not be read for scrolling')}});const c=config([value]),stamp=Date.parse(value.analyzedAt);
+ assert.equal(a.current(c,'a',stamp,now),true);assert.equal(a.current(c,'other',stamp,now),false);assert.equal(a.current(c,'a',stamp+1,now),false);value.ready=false;assert.equal(a.current(c,'a',stamp,now),false);value.ready=true;assert.equal(a.current(c,'a',stamp,Date.parse('2026-11-01')),false);
+});

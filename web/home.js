@@ -148,11 +148,12 @@
   function topButtonCount() {return dashboardOn ? 1 : 3;}
   var dashboardNodes = {}, mediaItems = [], mediaTrack = null, newsItems = [], videoItems = [], videoTrack = null;
   var mediaSnapshot = null, videoSnapshot = null, pointerX = null, pointerY = null;
-  var Z = {DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
+  var newsTrack = null, newsReportState = null;
+  var Z = {REPORT:'report', DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
   var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
 
-  function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
+  function sheetOpen() { return st.zone === Z.REPORT || st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
 
   function updateFocus() {
     var i, list;
@@ -170,6 +171,7 @@
     for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) setClass(dashboardNodes[key], 'focus', st.zone === Z.DASHBOARD && dashboardItems[st.dashboard] === key);
     focusMedia();
     focusVideos();
+    focusNews();
     renderFocusDetails();
     list = $('home-widgets').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.WIDGETS && st.widget === i);
@@ -451,27 +453,82 @@
     el('div', 'video-stamp', panel, (HomeProfile.labels.synced || 'Synced') + ' ' + new Date(HomeProfile.config.youtubeFeed.observedAt).toLocaleString(I18N.locale()));
   }
 
+  function newsDate(at) {
+    var d = new Date(at);function two(n){return ('0'+n).slice(-2);}
+    return two(d.getDate())+'/'+two(d.getMonth()+1)+'/'+d.getFullYear()+' '+two(d.getHours())+':'+two(d.getMinutes());
+  }
+
+  function newsPublication(item) {
+    return item.publishedAt === null ? HomeProfile.labels.newsPublicationUnknown || 'Publicação não informada' : (HomeProfile.labels.newsPublished || 'Publicação')+' '+newsDate(item.publishedAt);
+  }
+
+  function focusNews() {
+    if (!newsTrack) return;
+    var visible=st.tab===1?4:3,step=st.tab===1?424:584;
+    st.news=Math.max(0,Math.min(newsItems.length-1,st.news));
+    var first=Math.max(0,st.news-visible+1),show=HomeDashboard.items(st.tab).indexOf('news')>=0;
+    for(var i=0;i<newsTrack.children.length;i++){
+      var card=newsTrack.children[i],image=card.querySelector('img');
+      setClass(card,'selected',show&&st.zone===Z.DASHBOARD&&HomeDashboard.items(st.tab)[st.dashboard]==='news'&&i===st.news);
+      if(image&&!image.getAttribute('src')&&show&&i>=first&&i<=first+visible)image.src=image.getAttribute('data-src');
+    }
+    newsTrack.style.webkitTransform=newsTrack.style.transform='translateX('+(-first*step)+'px)';
+  }
+
+  function dismissNewsReport() {
+    newsReportState=null;var holder=$('news-report');if(holder){setClass(holder,'open',false);holder.textContent='';}
+  }
+
+  function closeNewsReport() {
+    dismissNewsReport();st.zone=Z.DASHBOARD;st.dashboard=Math.max(0,HomeDashboard.items(st.tab).indexOf('news'));updateFocus();
+  }
+
+  function openNewsReport() {
+    var selected=newsItems[st.news],fresh=NewsFeed.items(HomeProfile.config),item=null;
+    for(var i=0;selected&&i<fresh.length;i++)if(fresh[i].id===selected.id)item=fresh[i];
+    if(!item){renderNews();updateFocus();return;}
+    var holder=$('news-report');if(!holder)return;holder.textContent='';
+    var box=el('div','report-box',holder),body=el('div','report-scroll',box),report=item.report;
+    body.addEventListener('wheel',poke);
+    el('div','report-headline',body,item.title);
+    el('div','report-meta',body,item.source+' · '+newsPublication(item)+'\n'+(HomeProfile.labels.newsAnalyzed||'Análise')+' '+newsDate(item.analyzedAt)+' · Frank Investigator');
+    el('div','report-source',body,item.sourceUrl);
+    function section(title,text){if(!text)return;el('div','report-heading',body,title);el('div','report-text',body,text);}
+    if(report){
+      el('div','report-meta',body,report.reused?'Relatório reaproveitado do Frank Investigator':'Relatório salvo do Frank Investigator');
+      if(report.degraded)el('div','report-warning',body,'Análise com limitações');
+      section('Conclusão do Frank',report.conclusion||item.summary);
+      section('Pontos fortes',report.strengths.join('\n• ').replace(/^(.+)/,'• $1'));
+      section('Ressalvas',report.weaknesses.join('\n• ').replace(/^(.+)/,'• $1'));
+      section('Avaliação geral',report.quality);
+      var labels={pending:'Pendente',supported:'Com suporte',disputed:'Contestado',mixed:'Misto',needs_more_evidence:'Precisa de mais evidências',not_checkable:'Não verificável'},lines=[];
+      for(var code in labels)if(labels.hasOwnProperty(code)&&report.verdicts[code])lines.push(labels[code]+' ('+code+'): '+report.verdicts[code]);
+      section('Classificações do Frank',lines.join('\n'));
+    }else section('Resumo salvo do Frank',item.summary||'Resumo indisponível');
+    el('div','report-hint',box,'↑ ↓ · Rolar');
+    var close=el('button','report-close',box,'Voltar');close.onclick=closeNewsReport;
+    newsReportState={id:item.id,analyzedAt:item.analyzedAt};st.zone=Z.REPORT;setClass(holder,'open',true);updateFocus();
+  }
+
   function renderNews() {
-    var panel = dashboardNodes.news, old = panel.querySelector('.news-content'), labels = HomeProfile.labels;
-    if (old) panel.removeChild(old);
-    newsItems = NewsFeed.items(HomeProfile.config); st.news = Math.max(0, Math.min(newsItems.length - 1, st.news));
-    setClass(panel, 'has-news', newsItems.length > 0);
-    if (!newsItems.length) {panel.querySelector('.dashboard-subtitle').textContent = HomeProfile.config.newsFeed ? labels.newsRefresh || 'Relatórios aguardando atualização' : labels.newsPending || 'News not connected';return;}
-    var item = newsItems[st.news], content = el('div', 'news-content', panel);
-    setClass(panel, 'news-no-image', !item.image);
-    if (item.image) {
-      var image = el('img', 'news-image', content); image.alt = '';
-      image.onerror = function () {setClass(panel,'news-no-image',true);setClass(this,'failed',true);};image.src = item.image;
+    var panel=dashboardNodes.news,old=panel.querySelector('.news-viewport'),labels=HomeProfile.labels,previous=newsItems[st.news];
+    if(old)panel.removeChild(old);
+    newsTrack=null;newsItems=NewsFeed.items(HomeProfile.config);st.news=retainedArtworkIndex(newsItems,previous,st.news);
+    if(newsReportState){
+      var current=false;for(var n=0;n<newsItems.length;n++)if(newsItems[n].id===newsReportState.id&&newsItems[n].analyzedAt===newsReportState.analyzedAt)current=true;
+      if(!current){dismissNewsReport();if(st.zone===Z.REPORT){st.zone=Z.DASHBOARD;st.dashboard=Math.max(0,HomeDashboard.items(st.tab).indexOf('news'));}}
     }
-    el('div', 'news-headline', content, item.title);
-    el('div', 'news-summary', content, item.summary || labels.newsNoSummary || 'Resumo indisponível');
-    function date(at) {
-      var d = new Date(at);function two(n){return ('0'+n).slice(-2);}
-      return two(d.getDate())+'/'+two(d.getMonth()+1)+'/'+d.getFullYear()+' '+two(d.getHours())+':'+two(d.getMinutes());
+    setClass(panel,'has-news',newsItems.length>0);
+    if(!newsItems.length){panel.querySelector('.dashboard-subtitle').textContent=HomeProfile.config.newsFeed?labels.newsRefresh||'Relatórios aguardando atualização':labels.newsPending||'News not connected';return;}
+    var viewport=el('div','news-viewport',panel);newsTrack=el('div','news-track',viewport);
+    for(var i=0;i<newsItems.length;i++){
+      var item=newsItems[i],card=el('div','news-card',newsTrack);card.style.left=(i*(st.tab===1?424:584))+'px';
+      setClass(card,'no-image',!item.image);card.setAttribute('aria-label',item.title+' · '+item.source);
+      if(item.image){var image=el('img','news-image',card);image.alt='';image.setAttribute('data-src',item.image);image.onerror=function(){setClass(this.parentNode,'no-image',true);setClass(this,'failed',true);};}
+      el('div','news-headline',card,item.title);el('div','news-meta',card,item.source+' · '+newsPublication(item));
+      card.onmousemove=(function(index){return function(event){if(!pointerMoved(event)||saverOn||sheetOpen()||st.zone===Z.DRAWER||HomeDashboard.items(st.tab).indexOf('news')<0)return;st.news=index;st.zone=Z.DASHBOARD;st.dashboard=HomeDashboard.items(st.tab).indexOf('news');updateFocus();};})(i);
+      card.onclick=(function(index){return function(event){event.stopPropagation();if(saverOn||sheetOpen()||st.zone===Z.DRAWER||HomeDashboard.items(st.tab).indexOf('news')<0)return;st.news=index;st.zone=Z.DASHBOARD;st.dashboard=HomeDashboard.items(st.tab).indexOf('news');activate();};})(i);
     }
-    var publication = item.publishedAt === null ? labels.newsPublicationUnknown || 'Publicação não informada' : (labels.newsPublished || 'Publicação')+' '+date(item.publishedAt);
-    el('div', 'news-meta', content, item.source+' · '+publication+' · '+(labels.newsAnalyzed || 'Análise')+' '+date(item.analyzedAt)+' · Frank Investigator');
-    el('div', 'news-counter', content, '← '+(st.news+1)+'/'+newsItems.length+' →');
   }
 
   function renderDashboard() {
@@ -721,6 +778,7 @@
   }
 
   function closeSheets() {
+    dismissNewsReport();
     stopDiagnostics();
     setClass($('apps'), 'open', false);
     setClass($('settings'), 'open', false);
@@ -1130,9 +1188,11 @@
         if (videoTarget) TV.launch(videoTarget.id, videoTarget.params, function (ok) {if (!ok) toast(trf("Couldn't open {app}.", {app: 'YouTube'}));});
         else if (source === 'youtube' && videoItems.length) {renderVideos();updateFocus();toast(HomeProfile.labels.youtubeRefresh || 'Inscrições aguardando atualização');}
         else if (target) launcher(target.id, target.title)();
-        else if (source === 'news' && st.tab !== 1) selectTab(1);
-        else if (source === 'news' && newsItems.length) toast(newsItems[st.news].title);
+        else if (source === 'news' && newsItems.length) openNewsReport();
         else toast(HomeProfile.labels.newsPending || 'News not connected');
+        return;
+      case Z.REPORT:
+        move(0,0);
         return;
       case Z.WIDGETS:
         var kind = widgetKinds[st.widget];
@@ -1189,11 +1249,17 @@
         else if (dy < 0) {st.zone = dashboardOn && HomeDashboard.items(st.tab).length ? Z.DASHBOARD : cards.length ? Z.CARDS : Z.TOP; st.dashboard = Math.max(0, HomeDashboard.items(st.tab).length - 1); st.top = st.tab;}
         else if (dy > 0) {st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX($('home-widgets').children[st.widget]));}
         break;
+      case Z.REPORT:
+        var validReport=newsReportState&&NewsFeed.current(HomeProfile.config,newsReportState.id,newsReportState.analyzedAt);
+        if(!validReport){closeNewsReport();renderNews();updateFocus();break;}
+        var reportBody=$('news-report').querySelector('.report-scroll');
+        if(reportBody&&dy)reportBody.scrollTop+=dy*140;
+        break;
       case Z.DASHBOARD:
         if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'youtube' && videoItems.length && (dx < 0 || st.video < videoItems.length - 1)) {
           st.video = Math.max(0, Math.min(videoItems.length - 1, st.video + dx)); updateFocus(); return;
         }
-        if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'news' && newsItems.length) {st.news = Math.max(0, Math.min(newsItems.length - 1, st.news + dx));renderNews();updateFocus();return;}
+        if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'news' && newsItems.length) {st.news = Math.max(0, Math.min(newsItems.length - 1, st.news + dx));updateFocus();return;}
         if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'media' && mediaItems.length && (dx > 0 || st.media > 0)) {
           st.media = Math.max(0, Math.min(mediaItems.length - 1, st.media + dx)); updateFocus(); return;
         }
@@ -1246,6 +1312,7 @@
   }
 
   function back() {
+    if(st.zone===Z.REPORT){closeNewsReport();return;}
     if (calendarOn) {closeSheets();st.zone = Z.WIDGETS;st.widget = 2;updateFocus();return;}
     if (diagnosticsOn || homelabOn) { openSettings(); return; }
     if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
@@ -1451,7 +1518,7 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
       hideSaver();
-      if (diagnosticsOn || homelabOn || calendarOn) closeSheets();
+      if (diagnosticsOn || homelabOn || calendarOn || st.zone===Z.REPORT) closeSheets();
       stopDiagnostics();
       syncHomeWidgets();
       return;
