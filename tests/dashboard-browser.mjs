@@ -53,16 +53,17 @@ try {
         feed.events.forEach(function(event,i){var start=new Date(i?tomorrow:today);start.setHours(16,0,0,0);event.start=start.toISOString();event.end=new Date(start.getTime()+3600000).toISOString()});
       }
       if(profile&&profile.newsFeed){profile.newsFeed.observedAt=new Date().toISOString();profile.newsFeed.items.forEach(function(item){item.analyzedAt=new Date().toISOString();if(item.publishedAt)item.publishedAt=new Date(Date.now()-3600000).toISOString()});}
+      if(profile&&profile.youtubeFeed)profile.youtubeFeed.observedAt=new Date().toISOString();
       window.__config=value;
     }});
-    window.__launches=[]; window.__failLaunch=false;
+    window.__launches=[]; window.__launchParams=[]; window.__failLaunch=false;
     window.PalmServiceBridge=function(){
       this.cancel=function(){};
       this.call=function(uri,body){
         var self=this,p=JSON.parse(body),res={returnValue:true};
         if(uri.indexOf('getAppLoadStatus')>=0) res.exist=CONFIG.homeProfile.items.some(function(x){return x.id===p.appId});
         else if(uri.indexOf('getAllInputStatus')>=0) res.devices=[];
-        else if(uri.indexOf('/launch')>=0){window.__launches.push(p.id);res.returnValue=!window.__failLaunch;}
+        else if(uri.indexOf('/launch')>=0){window.__launches.push(p.id);window.__launchParams.push(p.params||null);res.returnValue=!window.__failLaunch;}
         else if(uri.indexOf('/exec')>=0){
           res.stdoutString=p.command.indexOf('appinfo.json')>=0 ? JSON.stringify([{id:'org.webosbrew.hbchannel',title:'Homebrew',version:'0.7.3'}]) : '';
         }
@@ -97,7 +98,7 @@ try {
   const geometry=await evaluate(`(function(){var y=document.querySelector('[data-panel=youtube]').getBoundingClientRect(),m=document.querySelector('[data-panel=media]').getBoundingClientRect(),n=document.querySelector('[data-panel=news]').getBoundingClientRect(),w=document.getElementById('home-widgets').getBoundingClientRect(),s=document.getElementById('platter').getBoundingClientRect();return {ratio:y.width/m.width,newsBelow:n.top>y.bottom,widgetsBelow:w.top>n.bottom,shelfBelow:s.top>w.bottom}})()`);
   assert.deepEqual(geometry,{ratio:2,newsBelow:true,widgetsBelow:true,shelfBelow:true});
   assert.deepEqual(await evaluate("Array.prototype.map.call(document.querySelectorAll('#home-widgets button'),function(x){return x.getAttribute('data-widget')})"),['arch','weather','calendar','webosbrew']);
-  const navigation=await evaluate(`(function(){FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(0,1);var order=[FreeMyTV.state.zone];FreeMyTV.move(1,0);order.push(HomeDashboard.items(0)[FreeMyTV.state.dashboard]);FreeMyTV.move(0,1);order.push(HomeDashboard.items(0)[FreeMyTV.state.dashboard]);FreeMyTV.move(0,1);order.push(FreeMyTV.state.zone);FreeMyTV.move(0,1);order.push(FreeMyTV.state.zone);return order})()`);
+  const navigation=await evaluate(`(function(){FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.state.video=2;FreeMyTV.move(0,1);var order=[FreeMyTV.state.zone];FreeMyTV.move(1,0);order.push(HomeDashboard.items(0)[FreeMyTV.state.dashboard]);FreeMyTV.move(0,1);order.push(HomeDashboard.items(0)[FreeMyTV.state.dashboard]);FreeMyTV.move(0,1);order.push(FreeMyTV.state.zone);FreeMyTV.move(0,1);order.push(FreeMyTV.state.zone);return order})()`);
   assert.deepEqual(navigation,['dashboard','media','news','widgets','shelf']);
   await evaluate("document.querySelector('[data-panel=youtube]').click();document.querySelector('[data-panel=media]').click()");
   assert.deepEqual(await evaluate('window.__launches.slice(-2)'),['com.cobalt.youtube.adfree','space.nuvio.webos']);
@@ -153,6 +154,21 @@ try {
   assert.ok(noNewsImage<40,'Missing cached image must not leave a blank half-width column');
 
 
+  assert.equal(await evaluate("document.querySelectorAll('.video-card').length"),3,'YouTube subscriptions must render image cards');
+  const videos=await evaluate(`(function(){FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.video=0;FreeMyTV.move(1,0);var selected=FreeMyTV.state.video;document.querySelector('.video-card').click();return {selected:selected,id:window.__launches[window.__launches.length-1],params:window.__launchParams[window.__launchParams.length-1]}})()`);
+  assert.deepEqual(videos,{selected:1,id:'com.cobalt.youtube.adfree',params:{contentTarget:'https://www.youtube.com/watch?v=VIDEO000001'}});
+  assert.equal(await evaluate("document.querySelectorAll('.video-card img[src]').length"),3);
+  assert.equal(await evaluate("document.querySelector('.video-card img').naturalWidth>0"),true,'Subscription artwork loads offline');
+  await evaluate("window.__failLaunch=true;document.querySelector('.video-card').click();window.__failLaunch=false");
+  await wait(100);
+  const videoFailure=await evaluate("document.getElementById('toast').textContent");
+  assert.ok(videoFailure.indexOf('YouTube')>=0,'Launch rejection must remain visible');
+  const hiddenVideo=await evaluate(`(function(){document.querySelectorAll('#tabs .tab')[1].click();var before=window.__launches.length;document.querySelector('.video-card').click();document.querySelectorAll('#tabs .tab')[0].click();return window.__launches.length-before})()`);
+  assert.equal(hiddenVideo,0,'Hidden subscription cards cannot launch');
+  const identityVideo=await evaluate(`(function(){var feed=CONFIG.homeProfile.youtubeFeed;try{feed.accountConfirmed=false;document.querySelector('.video-card').click();return {cards:document.querySelectorAll('.video-card').length,last:window.__launches.length}}finally{feed.accountConfirmed=true;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.equal(identityVideo.cards,0,'Loss of account confirmation removes stale video cards');
+  const staleVideo=await evaluate(`(function(){var feed=CONFIG.homeProfile.youtubeFeed,at=feed.observedAt;try{feed.observedAt='1999-01-01';document.querySelectorAll('#tabs .tab')[0].click();return document.querySelectorAll('.video-card').length}finally{feed.observedAt=at;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.equal(staleVideo,0,'Expired snapshots cannot retain subscription artwork');
   const cancellation=await evaluate(`(function(){
     var old=TV.launch,oldDismiss=TV.dismissScreensaver,pending=[],dismissed=0;
     try {
@@ -174,7 +190,7 @@ try {
   const overflow = await evaluate("Array.prototype.some.call(document.querySelectorAll('#dashboard .dashboard-subtitle'),function(x){return x.clientWidth>0 && (x.scrollWidth>x.clientWidth || x.getBoundingClientRect().right>x.parentNode.getBoundingClientRect().right)})");
   assert.equal(overflow,false,'Panel subtitles must wrap within their card');
   if(process.env.DASHBOARD_SCREENSHOT){await evaluate("Prefs.set('theme','dark');Data.settingsChanged();document.getElementById('toast').className=''");await wait(2300);const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.DASHBOARD_SCREENSHOT,Buffer.from(shot.data,'base64'));}
-  console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,pendingYouTubeExplicit:true,frankNews:true,cachedNewsImages:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,personalCalendar:true,calendarStaleGuard:true,oledPolicyPreserved:true}));
+  console.log(JSON.stringify({pass:true,tabs:4,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,youtubeCards:true,youtubeIdentityAndStaleGuard:true,frankNews:true,cachedNewsImages:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,personalCalendar:true,calendarStaleGuard:true,oledPolicyPreserved:true}));
   }
 } finally {
   // Let Chrome flush and stop its helpers before deleting their profile, including on Linux CI.
