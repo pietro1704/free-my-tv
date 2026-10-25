@@ -180,10 +180,32 @@ try {
 
 
   assert.equal(await evaluate("document.querySelectorAll('.video-card').length"),3,'YouTube subscriptions must render image cards');
+  const videoLayout=await evaluate(`(function(){var card=document.querySelector('.video-card'),image=card.querySelector('img').getBoundingClientRect(),name=card.querySelector('.video-name').getBoundingClientRect(),channel=card.querySelector('.video-channel').getBoundingClientRect(),viewport=document.querySelector('.video-viewport').getBoundingClientRect(),shelf=document.getElementById('platter').getBoundingClientRect();return {ratio:Math.round(image.width/image.height*1000),titleBelow:name.top>=image.bottom,channelBelow:channel.top>=name.bottom,inside:channel.bottom<=viewport.bottom,screen:shelf.bottom<=1080}})()`);
+  assert.deepEqual(videoLayout,{ratio:1778,titleBelow:true,channelBelow:true,inside:true,screen:true},'16:9 thumbnails and both text lines must stay separate and within the TV');
   const videos=await evaluate(`(function(){FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.video=0;FreeMyTV.move(1,0);var selected=FreeMyTV.state.video;document.querySelector('.video-card').click();return {selected:selected,id:window.__launches[window.__launches.length-1],params:window.__launchParams[window.__launchParams.length-1]}})()`);
   assert.deepEqual(videos,{selected:1,id:'com.cobalt.youtube.adfree',params:{contentTarget:'https://www.youtube.com/watch?v=VIDEO000001'}});
   assert.equal(await evaluate("document.querySelectorAll('.video-card img[src]').length"),3);
   assert.equal(await evaluate("document.querySelector('.video-card img').naturalWidth>0"),true,'Subscription artwork loads offline');
+  const videoCarousel=await evaluate(`(function(){var feed=CONFIG.homeProfile.youtubeFeed,original=feed.items.slice();try{
+    for(var i=4;i<=7;i++)feed.items.push({id:'VIDEO00000'+i,title:'Extra subscription '+i,channel:'Creator',rank:i,image:original[0].image});
+    document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click();
+    FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.video=0;
+    for(var step=0;step<5;step++)FreeMyTV.move(1,0);
+    var card=document.querySelectorAll('.video-card')[5].getBoundingClientRect(),viewport=document.querySelector('.video-viewport').getBoundingClientRect();FreeMyTV.activate();
+    return {selected:FreeMyTV.state.video,visible:card.left>=viewport.left&&card.right<=viewport.right,params:window.__launchParams[window.__launchParams.length-1]};
+  }finally{feed.items=original;document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.deepEqual(videoCarousel,{selected:5,visible:true,params:{contentTarget:'https://www.youtube.com/watch?v=VIDEO000006'}},'Scrolling thumbnails must keep the focused video and exact target aligned');
+  const missingVideoArt=await evaluate(`(function(){var row=CONFIG.homeProfile.youtubeFeed.items[0],image=row.image,title=row.title,channel=row.channel;try{
+    row.image='';row.title='<img src=x onerror=bad()> '+new Array(30).join('Long title ');row.channel=new Array(30).join('Long channel ');
+    document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click();
+    var card=document.querySelector('.video-card'),art=card.querySelector('.video-art').getBoundingClientRect(),name=card.querySelector('.video-name').getBoundingClientRect(),channelRect=card.querySelector('.video-channel').getBoundingClientRect();
+    return {reserved:Math.abs(art.width/art.height-16/9)<0.01,titleBelow:name.top>=art.bottom,channelBelow:channelRect.top>=name.bottom,noHTML:card.querySelectorAll('.video-name img').length===0,titleVisible:name.height>0&&name.height<=48,channelInside:channelRect.bottom<=card.getBoundingClientRect().bottom};
+  }finally{row.image=image;row.title=title;row.channel=channel;document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()}})()`);
+  assert.deepEqual(missingVideoArt,{reserved:true,titleBelow:true,channelBelow:true,noHTML:true,titleVisible:true,channelInside:true},'Missing thumbnails and long untrusted titles must preserve the text layout');
+  await evaluate("document.querySelector('.video-card img').src='data:image/png;base64,aGVsbG8='");
+  await wait(100);
+  assert.equal(await evaluate("document.querySelector('.video-card img').className==='failed' && document.querySelector('.video-name').getBoundingClientRect().top>=document.querySelector('.video-art').getBoundingClientRect().bottom"),true,'Decode failure keeps title below the reserved image');
+  await evaluate("document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()");
   await evaluate("window.__failLaunch=true;document.querySelector('.video-card').click();window.__failLaunch=false");
   await wait(100);
   const videoFailure=await evaluate("document.getElementById('toast').textContent");
