@@ -145,9 +145,9 @@
 
   var dashboardOn = !!HomeProfile.config.dashboard;
   function tabCount() {return dashboardOn ? 4 : 3;}
-  var dashboardNodes = {}, mediaItems = [], mediaTrack = null, newsItems = [];
+  var dashboardNodes = {}, mediaItems = [], mediaTrack = null, newsItems = [], videoItems = [], videoTrack = null;
   var Z = {DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
+  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
@@ -167,6 +167,7 @@
     var dashboardItems = HomeDashboard.items(st.tab);
     for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) setClass(dashboardNodes[key], 'focus', st.zone === Z.DASHBOARD && dashboardItems[st.dashboard] === key);
     focusMedia();
+    focusVideos();
     list = $('home-widgets').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.WIDGETS && st.widget === i);
     list = $('tiles').children;
@@ -318,6 +319,51 @@
     if (at) el('div', 'media-stamp', panel, (HomeProfile.labels.synced || 'Synced') + ' ' + new Date(at).toLocaleString(I18N.locale()));
   }
 
+  function focusVideos() {
+    if (!videoTrack) return;
+    st.video = Math.max(0, Math.min(videoItems.length - 1, st.video));
+    var first = Math.max(0, st.video - 2);
+    for (var i = 0; i < videoTrack.children.length; i++) {
+      var card = videoTrack.children[i], image = card.querySelector('img');
+      setClass(card, 'selected', st.zone === Z.DASHBOARD && HomeDashboard.items(st.tab)[st.dashboard] === 'youtube' && i === st.video);
+      if (image && !image.getAttribute('src') && i >= first && i < first + 4 && HomeDashboard.items(st.tab).indexOf('youtube') >= 0) image.src = image.getAttribute('data-src');
+    }
+    videoTrack.style.webkitTransform = videoTrack.style.transform = 'translateX(' + (-first * 350) + 'px)';
+  }
+
+  function renderVideos() {
+    var panel = dashboardNodes.youtube, old = panel.querySelector('.video-viewport');
+    if (old) panel.removeChild(old);
+    var stamp = panel.querySelector('.video-stamp');
+    if (stamp) panel.removeChild(stamp);
+    videoTrack = null; videoItems = YouTubeFeed.items(HomeProfile.config);
+    setClass(panel, 'has-videos', videoItems.length > 0);
+    if (!videoItems.length) {
+      panel.querySelector('.dashboard-subtitle').textContent = HomeProfile.config.youtubeFeed ? HomeProfile.labels.youtubeRefresh || 'Inscrições aguardando atualização' : HomeProfile.labels.youtubePending || 'Subscriptions not connected';
+      return;
+    }
+    var viewport = el('div', 'video-viewport', panel);
+    videoTrack = el('div', 'video-track', viewport);
+    for (var i = 0; i < videoItems.length; i++) {
+      var item = videoItems[i], card = el('div', 'video-card', videoTrack);
+      card.style.left = (i * 350) + 'px';
+      if (item.image) {
+        var image = el('img', '', card); image.alt = ''; image.setAttribute('data-src', item.image);
+        image.onerror = function () {setClass(this, 'failed', true);};
+      }
+      el('div', 'video-shade', card);
+      el('div', 'video-name', card, item.title);
+      el('div', 'video-channel', card, item.channel);
+      el('div', 'video-duration', card, item.live ? HomeProfile.labels.youtubeLive || 'Ao vivo' : item.liveCaptured ? HomeProfile.labels.youtubeLiveCaptured || 'Live na captura' : item.duration);
+      card.onclick = (function (index) {return function (event) {
+        event.stopPropagation();
+        if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf('youtube') < 0) return;
+        st.video = index; st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf('youtube'); updateFocus(); activate();
+      };})(i);
+    }
+    el('div', 'video-stamp', panel, (HomeProfile.labels.synced || 'Synced') + ' ' + new Date(HomeProfile.config.youtubeFeed.observedAt).toLocaleString(I18N.locale()));
+  }
+
   function renderNews() {
     var panel = dashboardNodes.news, old = panel.querySelector('.news-content'), labels = HomeProfile.labels;
     if (old) panel.removeChild(old);
@@ -364,6 +410,7 @@
       }
     }
     renderMedia();
+    renderVideos();
     renderNews();
     setClass(body, 'dashboard-home', true);
     holder.setAttribute('data-view', HomeDashboard.tabs[st.tab]);
@@ -978,7 +1025,10 @@
         return;
       case Z.DASHBOARD:
         var source = HomeDashboard.items(st.tab)[st.dashboard], target = HomeDashboard.app(HomeProfile.config, source);
-        if (target) launcher(target.id, target.title)();
+        var videoTarget = source === 'youtube' && videoItems.length ? YouTubeFeed.target(HomeProfile.config, st.video) : null;
+        if (videoTarget) TV.launch(videoTarget.id, videoTarget.params, function (ok) {if (!ok) toast(trf("Couldn't open {app}.", {app: 'YouTube'}));});
+        else if (source === 'youtube' && videoItems.length) {renderVideos();updateFocus();toast(HomeProfile.labels.youtubeRefresh || 'Inscrições aguardando atualização');}
+        else if (target) launcher(target.id, target.title)();
         else if (source === 'news' && st.tab !== 1) selectTab(1);
         else if (source === 'news' && newsItems.length) toast(newsItems[st.news].title);
         else toast(HomeProfile.labels.newsPending || 'News not connected');
@@ -1039,6 +1089,9 @@
         else if (dy > 0) {st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX($('home-widgets').children[st.widget]));}
         break;
       case Z.DASHBOARD:
+        if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'youtube' && videoItems.length && (dx < 0 || st.video < videoItems.length - 1)) {
+          st.video = Math.max(0, Math.min(videoItems.length - 1, st.video + dx)); updateFocus(); return;
+        }
         if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'news' && newsItems.length) {st.news = Math.max(0, Math.min(newsItems.length - 1, st.news + dx));renderNews();updateFocus();return;}
         if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'media' && mediaItems.length && (dx > 0 || st.media > 0)) {
           st.media = Math.max(0, Math.min(mediaItems.length - 1, st.media + dx)); updateFocus(); return;

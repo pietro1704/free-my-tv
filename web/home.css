@@ -604,3 +604,18 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #dashboard[data-view="news"] .news-summary { display: block; position: absolute; left: 540px; right: 28px; top: 112px; max-height: 152px; overflow: hidden; font-size: 22px; line-height: 29px; color: #aaa; }
 #dashboard[data-view="news"] .news-meta { left: 540px; bottom: 20px; }
 .dashboard-news.news-no-image .news-headline, .dashboard-news.news-no-image .news-meta, #dashboard[data-view="news"] .news-no-image .news-headline, #dashboard[data-view="news"] .news-no-image .news-meta, #dashboard[data-view="news"] .news-no-image .news-summary { left: 26px; }
+
+/* Subscription artwork is local and loaded only around the focused video. */
+.dashboard-youtube.has-videos .dashboard-title { position: absolute; left: 20px; top: 10px; font-size: 24px; line-height: 30px; }
+.dashboard-youtube.has-videos .dashboard-subtitle, .dashboard-youtube.has-videos .dashboard-icon { display: none; }
+.video-viewport { position: absolute; left: 18px; right: 18px; top: 48px; height: 134px; overflow: hidden; }
+.video-track { position: relative; height: 130px; }
+.video-card { position: absolute; top: 0; width: 336px; height: 130px; border: 2px solid #333; border-radius: 8px; overflow: hidden; box-sizing: border-box; background: #090909; }
+.video-card.selected { border-color: #ddd; }
+.video-card img { width: 100%; height: 100%; object-fit: cover; }
+.video-card img.failed { visibility: hidden; }
+.video-shade { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.95)); }
+.video-name { position: absolute; left: 10px; right: 10px; bottom: 26px; font-size: 18px; line-height: 22px; color: #ddd; max-height: 44px; overflow: hidden; }
+.video-channel { position: absolute; left: 10px; right: 10px; bottom: 7px; font-size: 14px; line-height: 17px; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.video-duration { position: absolute; right: 8px; top: 6px; background: rgba(0,0,0,0.8); font-size: 14px; color: #bbb; padding: 2px 5px; border-radius: 4px; }
+.video-stamp { position: absolute; left: 20px; bottom: 6px; font-size: 13px; color: #888; }

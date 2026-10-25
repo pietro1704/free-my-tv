@@ -127,5 +127,41 @@
         "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kX1cAAAAASUVORK5CYII="
       }
     ]
+  },
+  "youtubeFeed": {
+    "source": "youtube_subscriptions",
+    "available": true,
+    "accountConfirmed": true,
+    "appId": "com.cobalt.youtube.adfree",
+    "observedAt": "2026-10-25T19:59:00Z",
+    "items": [
+      {
+        "id": "VIDEO000001",
+        "title": "YouTube fixture 0",
+        "channel": "Fixture channel",
+        "duration": "12:34",
+        "publishedText": "h\u00e1 1 hora",
+        "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kX1cAAAAASUVORK5CYII=",
+        "rank": 0
+      },
+      {
+        "id": "VIDEO000002",
+        "title": "YouTube fixture 1",
+        "channel": "Fixture channel",
+        "duration": "12:34",
+        "publishedText": "h\u00e1 1 hora",
+        "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kX1cAAAAASUVORK5CYII=",
+        "rank": 1
+      },
+      {
+        "id": "VIDEO000003",
+        "title": "YouTube fixture 2",
+        "channel": "Fixture channel",
+        "duration": "12:34",
+        "publishedText": "h\u00e1 1 hora",
+        "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kX1cAAAAASUVORK5CYII=",
+        "rank": 2
+      }
+    ]
   }
 }
