@@ -590,3 +590,17 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 /* Calendar rows are read-only and retain room for a two-line event title. */
 .calendar-sheet .box .row { font-size: 18px; line-height: 22px; padding: 9px 24px; box-sizing: border-box; }
 .calendar-sheet .box .row .value { position: static; display: block; max-width: 100%; font-size: 24px; line-height: 28px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Frank report cards use cached photos and keep article and analysis dates distinct. */
+.dashboard-news.has-news .dashboard-title, .dashboard-news.has-news .dashboard-subtitle { display: none; }
+.news-image { position: absolute; left: 16px; top: 12px; width: 128px; height: 80px; object-fit: cover; border-radius: 8px; }
+.news-image.failed { display: none; }
+.news-headline { position: absolute; left: 164px; right: 94px; top: 10px; font-size: 23px; line-height: 29px; color: #ccc; max-height: 58px; overflow: hidden; }
+.news-meta { position: absolute; left: 164px; right: 18px; bottom: 9px; font-size: 16px; line-height: 19px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.news-counter { position: absolute; right: 16px; top: 8px; color: #999; font-size: 17px; }
+.news-summary { display: none; }
+#dashboard[data-view="news"] .news-image { left: 26px; top: 26px; width: 480px; height: 280px; }
+#dashboard[data-view="news"] .news-headline { left: 540px; top: 26px; font-size: 28px; line-height: 34px; max-height: 68px; }
+#dashboard[data-view="news"] .news-summary { display: block; position: absolute; left: 540px; right: 28px; top: 112px; max-height: 152px; overflow: hidden; font-size: 22px; line-height: 29px; color: #aaa; }
+#dashboard[data-view="news"] .news-meta { left: 540px; bottom: 20px; }
+.dashboard-news.news-no-image .news-headline, .dashboard-news.news-no-image .news-meta, #dashboard[data-view="news"] .news-no-image .news-headline, #dashboard[data-view="news"] .news-no-image .news-meta, #dashboard[data-view="news"] .news-no-image .news-summary { left: 26px; }

@@ -145,9 +145,9 @@
 
   var dashboardOn = !!HomeProfile.config.dashboard;
   function tabCount() {return dashboardOn ? 4 : 3;}
-  var dashboardNodes = {}, mediaItems = [], mediaTrack = null;
+  var dashboardNodes = {}, mediaItems = [], mediaTrack = null, newsItems = [];
   var Z = {DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
+  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
@@ -318,6 +318,29 @@
     if (at) el('div', 'media-stamp', panel, (HomeProfile.labels.synced || 'Synced') + ' ' + new Date(at).toLocaleString(I18N.locale()));
   }
 
+  function renderNews() {
+    var panel = dashboardNodes.news, old = panel.querySelector('.news-content'), labels = HomeProfile.labels;
+    if (old) panel.removeChild(old);
+    newsItems = NewsFeed.items(HomeProfile.config); st.news = Math.max(0, Math.min(newsItems.length - 1, st.news));
+    setClass(panel, 'has-news', newsItems.length > 0);
+    if (!newsItems.length) {panel.querySelector('.dashboard-subtitle').textContent = HomeProfile.config.newsFeed ? labels.newsRefresh || 'Relatórios aguardando atualização' : labels.newsPending || 'News not connected';return;}
+    var item = newsItems[st.news], content = el('div', 'news-content', panel);
+    setClass(panel, 'news-no-image', !item.image);
+    if (item.image) {
+      var image = el('img', 'news-image', content); image.alt = '';
+      image.onerror = function () {setClass(panel,'news-no-image',true);setClass(this,'failed',true);};image.src = item.image;
+    }
+    el('div', 'news-headline', content, item.title);
+    el('div', 'news-summary', content, item.summary || labels.newsNoSummary || 'Resumo indisponível');
+    function date(at) {
+      var d = new Date(at);function two(n){return ('0'+n).slice(-2);}
+      return two(d.getDate())+'/'+two(d.getMonth()+1)+'/'+d.getFullYear()+' '+two(d.getHours())+':'+two(d.getMinutes());
+    }
+    var publication = item.publishedAt === null ? labels.newsPublicationUnknown || 'Publicação não informada' : (labels.newsPublished || 'Publicação')+' '+date(item.publishedAt);
+    el('div', 'news-meta', content, item.source+' · '+publication+' · '+(labels.newsAnalyzed || 'Análise')+' '+date(item.analyzedAt)+' · Frank Investigator');
+    el('div', 'news-counter', content, '← '+(st.news+1)+'/'+newsItems.length+' →');
+  }
+
   function renderDashboard() {
     var holder = $('dashboard'), labels = HomeProfile.labels;
     if (!dashboardNodes.youtube) {
@@ -341,6 +364,7 @@
       }
     }
     renderMedia();
+    renderNews();
     setClass(body, 'dashboard-home', true);
     holder.setAttribute('data-view', HomeDashboard.tabs[st.tab]);
     var visible = HomeDashboard.items(st.tab);
@@ -956,6 +980,7 @@
         var source = HomeDashboard.items(st.tab)[st.dashboard], target = HomeDashboard.app(HomeProfile.config, source);
         if (target) launcher(target.id, target.title)();
         else if (source === 'news' && st.tab !== 1) selectTab(1);
+        else if (source === 'news' && newsItems.length) toast(newsItems[st.news].title);
         else toast(HomeProfile.labels.newsPending || 'News not connected');
         return;
       case Z.WIDGETS:
@@ -1014,6 +1039,7 @@
         else if (dy > 0) {st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX($('home-widgets').children[st.widget]));}
         break;
       case Z.DASHBOARD:
+        if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'news' && newsItems.length) {st.news = Math.max(0, Math.min(newsItems.length - 1, st.news + dx));renderNews();updateFocus();return;}
         if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'media' && mediaItems.length && (dx > 0 || st.media > 0)) {
           st.media = Math.max(0, Math.min(mediaItems.length - 1, st.media + dx)); updateFocus(); return;
         }
