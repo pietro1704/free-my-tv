@@ -25,6 +25,8 @@ if [ "$what" = all ] || [ "$what" = web ]; then
   node --test tests/idle.test.cjs
   node --test tests/provider-picks.test.cjs
   node --test tests/widgets.test.cjs
+  node --test tests/nuvio-source.test.cjs
+  node --test tests/media-cards.test.cjs
   node --test tests/dashboard.test.cjs
   node --test tests/disney-mapping.test.cjs
   node --test tests/native-saver.test.cjs

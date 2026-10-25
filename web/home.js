@@ -145,9 +145,9 @@
 
   var dashboardOn = !!HomeProfile.config.dashboard;
   function tabCount() {return dashboardOn ? 4 : 3;}
-  var dashboardNodes = {};
+  var dashboardNodes = {}, mediaItems = [], mediaTrack = null;
   var Z = {DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
+  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
@@ -166,6 +166,7 @@
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.CARDS && st.card === i);
     var dashboardItems = HomeDashboard.items(st.tab);
     for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) setClass(dashboardNodes[key], 'focus', st.zone === Z.DASHBOARD && dashboardItems[st.dashboard] === key);
+    focusMedia();
     list = $('home-widgets').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.WIDGETS && st.widget === i);
     list = $('tiles').children;
@@ -273,6 +274,50 @@
     updateFocus();
   }
 
+  function focusMedia() {
+    if (!mediaTrack) return;
+    var nodes = mediaTrack.children, width = st.tab === 2 ? 6 : 1;
+    st.media = Math.max(0, Math.min(mediaItems.length - 1, st.media));
+    var first = Math.max(0, st.media - width + 1);
+    for (var i = 0; i < nodes.length; i++) {
+      setClass(nodes[i], 'selected', st.zone === Z.DASHBOARD && HomeDashboard.items(st.tab)[st.dashboard] === 'media' && i === st.media);
+      var image = nodes[i].querySelector('img');
+      if (image && !image.getAttribute('src') && i >= first && i <= first + width && HomeDashboard.items(st.tab).indexOf('media') >= 0) image.src = image.getAttribute('data-src');
+    }
+    mediaTrack.style.webkitTransform = mediaTrack.style.transform = 'translateX(' + (-first * 270) + 'px)';
+  }
+
+  function renderMedia() {
+    var panel = dashboardNodes.media, old = panel.querySelector('.media-viewport');
+    if (old) panel.removeChild(old);
+    var stamp = panel.querySelector('.media-stamp');
+    if (stamp) panel.removeChild(stamp);
+    mediaTrack = null; mediaItems = MediaCards.items(HomeProfile.config);
+    setClass(panel, 'has-media', mediaItems.length > 0);
+    if (!mediaItems.length) return;
+    var viewport = el('div', 'media-viewport', panel);
+    mediaTrack = el('div', 'media-track', viewport);
+    for (var i = 0; i < mediaItems.length; i++) {
+      var item = mediaItems[i], card = el('div', 'media-card', mediaTrack);
+      card.style.left = (i * 270) + 'px';
+      if (item.image) {
+        var image = el('img', '', card); image.alt = ''; image.setAttribute('referrerpolicy', 'no-referrer');
+        image.onerror = function () {setClass(this, 'failed', true);}; image.setAttribute('data-src', item.image);
+      }
+      el('div', 'media-shade', card);
+      el('div', 'media-name', card, item.title);
+      el('div', 'media-section', card, item.section === 'continue' ? HomeProfile.labels.continueWatching || 'Continue watching' : HomeProfile.labels.myList || 'My list');
+      if (item.progress) {var bar = el('div', 'media-progress', card); bar.style.width = item.progress + '%';}
+      card.onclick = (function (index) {return function (event) {
+        event.stopPropagation();
+        if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf('media') < 0) return;
+        st.media = index; st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf('media'); updateFocus(); activate();
+      };})(i);
+    }
+    var at = MediaCards.observed(HomeProfile.config);
+    if (at) el('div', 'media-stamp', panel, (HomeProfile.labels.synced || 'Synced') + ' ' + new Date(at).toLocaleString(I18N.locale()));
+  }
+
   function renderDashboard() {
     var holder = $('dashboard'), labels = HomeProfile.labels;
     if (!dashboardNodes.youtube) {
@@ -295,6 +340,7 @@
         };})(source);
       }
     }
+    renderMedia();
     setClass(body, 'dashboard-home', true);
     holder.setAttribute('data-view', HomeDashboard.tabs[st.tab]);
     var visible = HomeDashboard.items(st.tab);
@@ -951,6 +997,9 @@
         else if (dy > 0) {st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX($('home-widgets').children[st.widget]));}
         break;
       case Z.DASHBOARD:
+        if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'media' && mediaItems.length && (dx > 0 || st.media > 0)) {
+          st.media = Math.max(0, Math.min(mediaItems.length - 1, st.media + dx)); updateFocus(); return;
+        }
         var next = HomeDashboard.next(st.tab, st.dashboard, dx, dy);
         st.zone = next.zone;
         if (next.index !== undefined) st.dashboard = next.index;
