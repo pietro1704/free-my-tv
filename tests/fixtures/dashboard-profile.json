@@ -41,10 +41,16 @@
       {
         "id": "fixture-0",
         "title": "Fixture title 0",
-        "kind": "movie",
-        "section": "library",
-        "image": "https://image.tmdb.org/t/p/w500/fixture.jpg",
-        "updatedAt": 3
+        "kind": "series",
+        "section": "continue",
+        "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kX1cAAAAASUVORK5CYII=",
+        "updatedAt": 3,
+        "positionMs": 50,
+        "durationMs": 200,
+        "season": 1,
+        "episode": 2,
+        "episodeTitle": "Episode fixture",
+        "background": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kX1cAAAAASUVORK5CYII="
       },
       {
         "id": "fixture-1",

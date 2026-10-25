@@ -280,7 +280,7 @@
 
   function focusMedia() {
     if (!mediaTrack) return;
-    var nodes = mediaTrack.children, width = st.tab === 2 ? 6 : 1;
+    var nodes = mediaTrack.children, width = st.tab === 2 ? 9 : 2, step = st.tab === 2 ? 184 : 270;
     st.media = Math.max(0, Math.min(mediaItems.length - 1, st.media));
     var first = Math.max(0, st.media - width + 1);
     for (var i = 0; i < nodes.length; i++) {
@@ -288,7 +288,7 @@
       var image = nodes[i].querySelector('img');
       if (image && !image.getAttribute('src') && i >= first && i <= first + width && HomeDashboard.items(st.tab).indexOf('media') >= 0) image.src = image.getAttribute('data-src');
     }
-    mediaTrack.style.webkitTransform = mediaTrack.style.transform = 'translateX(' + (-first * 270) + 'px)';
+    mediaTrack.style.webkitTransform = mediaTrack.style.transform = 'translateX(' + (-first * step) + 'px)';
   }
 
   function renderMedia() {
@@ -298,20 +298,29 @@
     if (stamp) panel.removeChild(stamp);
     mediaTrack = null; mediaItems = MediaCards.items(HomeProfile.config);
     setClass(panel, 'has-media', mediaItems.length > 0);
+    setClass(body, 'media-artwork', mediaItems.length > 0 && (st.tab === 0 || st.tab === 2));
     if (!mediaItems.length) return;
     var viewport = el('div', 'media-viewport', panel);
     mediaTrack = el('div', 'media-track', viewport);
     for (var i = 0; i < mediaItems.length; i++) {
       var item = mediaItems[i], card = el('div', 'media-card', mediaTrack);
-      card.style.left = (i * 270) + 'px';
-      if (item.image) {
-        var image = el('img', '', card); image.alt = ''; image.setAttribute('referrerpolicy', 'no-referrer');
-        image.onerror = function () {setClass(this, 'failed', true);}; image.setAttribute('data-src', item.image);
+      card.style.left = (i * (st.tab === 2 ? 184 : 270)) + 'px';
+      var artwork = el('div', 'media-art', card), source = st.tab === 2 ? item.image || item.background : item.background || item.image;
+      setClass(artwork, 'poster-fallback', st.tab !== 2 && !item.background);
+      if (source) {
+        var image = el('img', '', artwork); image.alt = ''; image.setAttribute('referrerpolicy', 'no-referrer');
+        image.onerror = function () {setClass(this, 'failed', true);}; image.setAttribute('data-src', source);
       }
-      el('div', 'media-shade', card);
+      el('div', 'media-shade', artwork);
       el('div', 'media-name', card, item.title);
-      el('div', 'media-section', card, item.section === 'continue' ? HomeProfile.labels.continueWatching || 'Continue watching' : HomeProfile.labels.myList || 'My list');
-      if (item.progress) {var bar = el('div', 'media-progress', card); bar.style.width = item.progress + '%';}
+      el('div', 'media-section', artwork, item.section === 'continue' ? HomeProfile.labels.continueWatching || 'Continue watching' : HomeProfile.labels.myList || 'My list');
+      var details = [];
+      if (item.season !== undefined && item.episode !== undefined) details.push('T' + item.season + ' · E' + item.episode);
+      if (item.progress !== null) details.push(item.progress + '%');
+      el('div', 'media-detail', card, details.join(' · '));
+      if (item.episodeTitle) el('div', 'media-episode', card, item.episodeTitle);
+      card.setAttribute('aria-label', item.title + (details.length ? ' · ' + details.join(' · ') : '') + (item.episodeTitle ? ' · ' + item.episodeTitle : ''));
+      if (item.progress !== null) {var bar = el('div', 'media-progress', card); bar.style.width = item.progress + '%';}
       card.onclick = (function (index) {return function (event) {
         event.stopPropagation();
         if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf('media') < 0) return;

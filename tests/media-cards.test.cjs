@@ -16,3 +16,10 @@ test('finished progress is hidden; missing or credential-bearing artwork keeps a
  assert.equal(out.length,3);assert.ok(out.every(x=>x.image===''));assert.equal(out[2].title,'<img src=x onerror=bad()>');
  assert.equal(a.image('https://artworks.thetvdb.com/banners/a.jpg'),'https://artworks.thetvdb.com/banners/a.jpg');
 });
+test('cached artwork, finite progress and valid series episode details survive without inventing metadata',()=>{
+ const a=api(),cached='data:image/png;base64,aGVsbG8=',out=a.items(config([row('series',{kind:'series',section:'continue',positionMs:50,durationMs:200,season:1,episode:2,episodeTitle:'Episode title',image:cached,background:cached}),row('unknown',{section:'continue',positionMs:50,durationMs:Infinity}),row('library',{kind:'series',season:1,episode:2})]));
+ assert.equal(out[0].image,cached);assert.equal(out[0].background,cached);assert.equal(out[0].progress,25);assert.equal(out[0].season,1);assert.equal(out[0].episode,2);assert.equal(out[0].episodeTitle,'Episode title');
+ assert.equal(out.find(x=>x.id==='unknown').progress,null);assert.equal(out.find(x=>x.id==='library').season,undefined);
+ for(const value of ['data:text/html;base64,aGVsbG8=','data:image/svg+xml;base64,aGVsbG8=','data:image/png;base64,'+'a'.repeat(600001)])assert.equal(a.image(value),'');
+ const bad=a.items(config([row('bad',{kind:'series',section:'continue',positionMs:10,durationMs:100,season:1.2,episode:2})]))[0];assert.equal(bad.season,undefined);
+});

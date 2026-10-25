@@ -7,6 +7,7 @@ var MediaCards = (function () {
     return found && config.catalogApp === 'space.nuvio.webos' && value && value.appId === config.catalogApp && Object.prototype.toString.call(value.items) === '[object Array]' ? value : null;
   }
   function image(value) {
+    if (typeof value === 'string' && value.length <= 600000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/]+=*$/.test(value)) return value;
     return typeof value === 'string' && /^https:\/\/(image\.tmdb\.org\/t\/p\/(w[0-9]+|original)|artworks\.thetvdb\.com\/banners)\/[A-Za-z0-9_\/-]+\.(jpg|jpeg|png|webp)$/.test(value) ? value : '';
   }
   function items(config) {
@@ -15,10 +16,15 @@ var MediaCards = (function () {
     for (var i = 0; i < value.items.length && i < 2048; i++) {
       var row = value.items[i];
       if (!row || typeof row.id !== 'string' || !row.id || typeof row.title !== 'string' || !row.title || (row.kind !== 'movie' && row.kind !== 'series') || (row.section !== 'continue' && row.section !== 'library')) continue;
-      var progress = typeof row.positionMs === 'number' && typeof row.durationMs === 'number' && row.durationMs > 0 ? Math.max(0, Math.min(100, Math.round(row.positionMs * 100 / row.durationMs))) : 0;
+      var progress = row.section === 'continue' && typeof row.positionMs === 'number' && isFinite(row.positionMs) && typeof row.durationMs === 'number' && isFinite(row.durationMs) && row.durationMs > 0 ? Math.max(0, Math.min(100, Math.round(row.positionMs * 100 / row.durationMs))) : null;
       if (row.section === 'continue' && (typeof row.positionMs !== 'number' || !isFinite(row.positionMs) || row.positionMs <= 0 || progress >= 95)) continue;
-      out.push({id:row.id.slice(0,200), title:row.title.slice(0,180), kind:row.kind, image:image(row.image), section:row.section, progress:progress,
-        updatedAt:typeof row.updatedAt === 'number' && isFinite(row.updatedAt) ? row.updatedAt : 0});
+      var item = {id:row.id.slice(0,200), title:row.title.slice(0,180), kind:row.kind, image:image(row.image), background:image(row.background), section:row.section, progress:progress,
+        updatedAt:typeof row.updatedAt === 'number' && isFinite(row.updatedAt) ? row.updatedAt : 0};
+      if (row.kind === 'series' && row.section === 'continue' && typeof row.season === 'number' && isFinite(row.season) && row.season >= 0 && row.season <= 10000 && row.season % 1 === 0 && typeof row.episode === 'number' && isFinite(row.episode) && row.episode > 0 && row.episode <= 10000 && row.episode % 1 === 0) {
+        item.season = row.season; item.episode = row.episode;
+        item.episodeTitle = typeof row.episodeTitle === 'string' ? row.episodeTitle.slice(0,180) : '';
+      }
+      out.push(item);
     }
     out.sort(function (a,b) {return a.section === b.section ? b.updatedAt - a.updatedAt : a.section === 'continue' ? -1 : 1;});
     var unique = [];
