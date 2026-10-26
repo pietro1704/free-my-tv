@@ -1240,8 +1240,7 @@
         var source = HomeDashboard.items(st.tab)[st.dashboard], target = HomeDashboard.app(HomeProfile.config, source);
         var focused = focusedArtwork();
         if (((source === 'youtube' && videoItems.length) || (source === 'media' && mediaItems.length)) && !focused) {renderDashboard();return;}
-        var videoTarget = source === 'youtube' && videoItems.length ? YouTubeFeed.target(HomeProfile.config, st.video) : null;
-        if (videoTarget && videoTarget.params.contentTarget !== 'https://www.youtube.com/watch?v=' + focused.item.id) {renderDashboard();return;}
+        var videoTarget = source === 'youtube' && videoItems.length ? YouTubeFeed.target(HomeProfile.config, st.video, focused.item.id) : null;
         if (videoTarget) TV.launch(videoTarget.id, videoTarget.params, function (ok) {if (!ok) toast(trf("Couldn't open {app}.", {app: 'YouTube'}));});
         else if (source === 'youtube' && videoItems.length) {renderVideos();updateFocus();toast(HomeProfile.labels.youtubeRefresh || 'Inscrições aguardando atualização');}
         else if (target) launcher(target.id, target.title)();
