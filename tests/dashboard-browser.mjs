@@ -77,6 +77,7 @@ try {
   }
   if(process.env.DASHBOARD_LEGACY) {
     assert.equal(await evaluate('TV.name'),'webos');
+    assert.equal(await evaluate("document.getElementById('bgA').className='on';FreeMyTV.move(-1,0);document.getElementById('bgA').className==='on'"),true,'Dashboard presentation must not clear the legacy backdrop on focus');
     assert.equal(await evaluate("document.querySelectorAll('#tabs .tab').length"),3);
     assert.equal(await evaluate("document.querySelectorAll('#home-widgets button').length"),2);
     await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=5;FreeMyTV.activate()");
@@ -135,6 +136,28 @@ try {
   assert.equal(await evaluate("document.querySelectorAll('#tiles .tile').length"),3,'Dock editor can hide a configured app without uninstalling it');
   await evaluate("Prefs.set('profileShelf',null);FreeMyTV.back();FreeMyTV.back();document.dispatchEvent(new Event('webOSRelaunch'))");
   await wait(100);
+  async function togglePresentation(key) {
+    await evaluate("document.querySelector('#buttons button').click();document.querySelector('[data-setting="+key+"]').click();FreeMyTV.back()");
+    await wait(80);
+  }
+  await togglePresentation('presentation');
+  assert.equal(await evaluate("document.body.className.indexOf('cinematic-dashboard')>=0&&document.querySelectorAll('#sky canvas.on').length===1"),true,'Cinematic presentation uses the selected cached artwork');
+  await togglePresentation('contextualArtwork');
+  assert.equal(await evaluate("document.querySelector('.hero-art').style.backgroundImage===''&&document.querySelectorAll('#sky canvas.on').length===0"),true,'Static presentation cancels and clears contextual artwork');
+  await togglePresentation('cardDensity');
+  assert.equal(await evaluate("document.querySelector('.video-card').offsetWidth"),264,'Compact density changes the real card geometry');
+  await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(0,1);FreeMyTV.move(1,0)");
+  const densityId=await evaluate("document.querySelector('.video-card.selected').getAttribute('data-item-id')");
+  await evaluate('FreeMyTV.activate()');
+  assert.deepEqual(await evaluate('window.__launchParams[window.__launchParams.length-1]'),{contentTarget:'v='+densityId},'Density changes preserve exact launch identity');
+  await togglePresentation('focusEmphasis');
+  await togglePresentation('reducedMotion');
+  await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(0,1)");
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.video-card.selected')).transform==='none'&&getComputedStyle(document.querySelector('.video-card.selected')).transitionDuration==='0s'"),true,'Reduced motion keeps a static selected card without animation');
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.video-card.selected')).borderTopColor"),'rgb(255, 255, 255)','Strong focus remains visible without motion');
+  await togglePresentation('dashboardLayout');
+  assert.equal(await evaluate("document.querySelector('[data-panel=news]').style.display"),'','The mixed layout can be selected from Home Settings');
+  await evaluate("Prefs.set('presentation','oled');Prefs.set('contextualArtwork',true);Prefs.set('cardDensity','comfortable');Prefs.set('focusEmphasis','subtle');Prefs.set('reducedMotion',false);Data.settingsChanged()");
   await evaluate("Prefs.set('dashboardLayout','classic');Data.settingsChanged();FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(-1,0)");
   assert.equal(await evaluate("document.querySelectorAll('#buttons button').length"),1,'Dashboard header must have one controls entry');
   const header=await evaluate(`(function(){var title=document.getElementById('title').getBoundingClientRect(),tabs=document.getElementById('tabs').getBoundingClientRect(),button=document.querySelector('#buttons button').getBoundingClientRect(),content=document.getElementById('dashboard').getBoundingClientRect();return {compact:title.height<=40,sameRow:Math.abs(title.top-tabs.top)<25,separate:title.right<tabs.left&&tabs.right<button.left,above:Math.max(title.bottom,tabs.bottom,button.bottom)<content.top}})()`);

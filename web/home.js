@@ -161,7 +161,7 @@
   var st = {action:0, zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
   var artworkActions = null, previewItem = null, previewSource = '', keyArtworkTimer = 0, keyArtworkPending = false, keyArtworkLong = false, artworkLongTimer = 0;
-  var featurePreview = HomeHero.create($('feature-preview'));
+  var featurePreview = HomeHero.create($('feature-preview'),featureBackdrop);
   var dashboardScroll = null, dashboardStack = null, dashboardScrollTab = -1;
   var pressedArtwork = null;
   var artworkPress = false, artworkRefreshPending = false, artworkPressTimer = 0;
@@ -225,6 +225,10 @@
 
   function updateFocus() {
     var i, list;
+    setClass(body, 'cinematic-dashboard', dashboardOn && Prefs.presentation() === 'cinematic');
+    setClass(body, 'compact-cards', dashboardOn && Prefs.cardDensity() === 'compact');
+    setClass(body, 'strong-focus', dashboardOn && Prefs.focusEmphasis() === 'strong');
+    setClass(body, 'reduced-motion', dashboardOn && Prefs.reducedMotion());
     setClass(body, 'dock-focused', st.zone === Z.SHELF);
     list = $('tabs').children;
     for (i = 0; i < list.length; i++) {
@@ -422,7 +426,22 @@
       item = list[0];
     }
     previewItem = item || null;
-    featurePreview.update(item ? {id:item.id,title:item.title,meta:item.channel || item.episodeTitle || '',image:item.background || item.image} : null);
+    featurePreview.update(item ? {id:item.id,title:item.title,meta:item.channel || item.episodeTitle || '',presentation:Prefs.presentation(),image:Prefs.contextualArtwork() ? item.background || item.image : ''} : null);
+  }
+
+  function featureBackdrop(image) {
+    if (!dashboardOn) return;
+    if (!image || Prefs.presentation() !== 'cinematic' || !Prefs.contextualArtwork()) {
+      setClass($('bgA'),'on',false);setClass($('bgB'),'on',false);return;
+    }
+    var next = bgFront === 'bgA' ? 'bgB' : 'bgA', canvas = $(next);
+    canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+    setClass(canvas,'on',true);setClass($(bgFront),'on',false);bgFront=next;
+  }
+  function videoGeometry() {return Prefs.cardDensity() === 'compact' ? {step:276,visible:4} : {step:356,visible:3};}
+  function mediaGeometry() {
+    var compact = Prefs.cardDensity() === 'compact';
+    return st.tab === 2 ? {step:compact ? 136 : 184,visible:compact ? 12 : 9} : {step:compact ? 172 : 260,visible:compact ? 3 : 2};
   }
 
   function closeArtworkActions() {
@@ -484,7 +503,7 @@
 
   function focusMedia() {
     if (!mediaTrack) return;
-    var nodes = mediaTrack.children, width = st.tab === 2 ? 9 : 2, step = st.tab === 2 ? 184 : 270;
+    var geometry = mediaGeometry(), nodes = mediaTrack.children, width = geometry.visible, step = geometry.step;
     st.media = Math.max(0, Math.min(mediaItems.length - 1, st.media));
     var first = Math.max(0, st.media - width + 1);
     var selected = focusedArtwork();
@@ -514,7 +533,7 @@
     for (var i = 0; i < mediaItems.length; i++) {
       var item = mediaItems[i], card = el('div', 'media-card', mediaTrack);
       artworkHover(card, 'media', i);card.setAttribute('data-source','media');card.setAttribute('data-item-id',item.id);
-      card.style.left = (i * (st.tab === 2 ? 184 : 270)) + 'px';
+      card.style.left = (i * mediaGeometry().step) + 'px';
       var artwork = el('div', 'media-art', card), source = st.tab === 2 ? item.image || item.background : item.background || item.image;
       setClass(artwork, 'poster-fallback', st.tab !== 2 && !item.background);
       if (source) {
@@ -544,14 +563,14 @@
   function focusVideos() {
     if (!videoTrack) return;
     st.video = Math.max(0, Math.min(videoItems.length - 1, st.video));
-    var first = Math.max(0, st.video - 2);
+    var geometry = videoGeometry(), first = Math.max(0, st.video - geometry.visible + 1);
     var selected = focusedArtwork();
     for (var i = 0; i < videoTrack.children.length; i++) {
       var card = videoTrack.children[i], image = card.querySelector('img');
       setClass(card, 'selected', !!selected && selected.source === 'youtube' && i === st.video);
-      if (image && !image.getAttribute('src') && i >= first && i < first + 4 && dashboardItems().indexOf('youtube') >= 0) image.src = image.getAttribute('data-src');
+      if (image && !image.getAttribute('src') && i >= first && i < first + geometry.visible + 1 && dashboardItems().indexOf('youtube') >= 0) image.src = image.getAttribute('data-src');
     }
-    videoTrack.style.webkitTransform = videoTrack.style.transform = 'translateX(' + (-first * 372) + 'px)';
+    videoTrack.style.webkitTransform = videoTrack.style.transform = 'translateX(' + (-first * geometry.step) + 'px)';
   }
 
   function renderVideos() {
@@ -575,7 +594,7 @@
     for (var i = 0; i < videoItems.length; i++) {
       var item = videoItems[i], card = el('div', 'video-card', videoTrack);
       artworkHover(card, 'youtube', i);card.setAttribute('data-source','youtube');card.setAttribute('data-item-id',item.id);
-      card.style.left = (i * 372) + 'px';
+      card.style.left = (i * videoGeometry().step) + 'px';
       var artwork = el('div', 'video-art', card);
       if (item.image) {
         var image = el('img', '', artwork); image.alt = ''; image.setAttribute('data-src', item.image);
@@ -1141,6 +1160,14 @@
         closeSheets(); st.zone = Z.SHELF; openDrawer(); st.drawer = 0; updateFocus();
       }}, {label: HomeProfile.labels.diagnostics || 'CPU / RAM / Hz', value: '›', step: openDiagnostics});
     }
+    if (dashboardOn) rows = rows.concat([
+      {setting:'dashboardLayout',label:tr('Dashboard layout'),value:Prefs.dashboardLayout()==='cinema'?tr('Cinematic'):tr('Classic'),step:function(d){cycle('dashboardLayout',['cinema','classic'],Prefs.dashboardLayout(),d);Data.settingsChanged();}},
+      {setting:'presentation',label:tr('Presentation'),value:Prefs.presentation()==='oled'?'OLED':tr('Cinematic'),step:function(d){cycle('presentation',['oled','cinematic'],Prefs.presentation(),d);Data.settingsChanged();}},
+      {setting:'contextualArtwork',label:tr('Contextual artwork'),toggle:Prefs.contextualArtwork(),step:function(){Prefs.set('contextualArtwork',!Prefs.contextualArtwork());Data.settingsChanged();}},
+      {setting:'cardDensity',label:tr('Card density'),value:Prefs.cardDensity()==='compact'?tr('Compact'):tr('Comfortable'),step:function(d){cycle('cardDensity',['comfortable','compact'],Prefs.cardDensity(),d);Data.settingsChanged();}},
+      {setting:'focusEmphasis',label:tr('Focus emphasis'),value:Prefs.focusEmphasis()==='strong'?tr('Strong'):tr('Subtle'),step:function(d){cycle('focusEmphasis',['subtle','strong'],Prefs.focusEmphasis(),d);Data.settingsChanged();}},
+      {setting:'reducedMotion',label:tr('Reduced motion'),toggle:Prefs.reducedMotion(),step:function(){Prefs.set('reducedMotion',!Prefs.reducedMotion());Data.settingsChanged();}}
+    ]);
     if (dashboardOn) rows.push({label:tr('Restore cards'),value:'›',step:function(){Prefs.set('arrangement-youtube',null);Prefs.set('arrangement-media',null);renderDashboard();}});
     var names = ['Bitcoin', 'Ethereum', 'Solana', tr('Dollar'), 'Euro'];
     var count = HomeProfile.config.forex ? 5 : Data.currency === 'BRL' ? 4 : 3;
@@ -1183,6 +1210,7 @@
     list.style.height = Math.min(rowsNow.length, 7) * 78 + 'px';
     for (var i = 0; i < rowsNow.length; i++) {
       var r = rowsNow[i], row = el('div', 'row' + (r.dim ? ' dim' : ''), holder, r.label);
+      if (r.setting) row.setAttribute('data-setting',r.setting);
       if (r.toggle !== undefined) setClass(el('div', 'toggle', row), 'on', r.toggle);
       else {
         var v = el('span', 'value', row);
