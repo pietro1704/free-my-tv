@@ -446,8 +446,9 @@ try {
   })()`);
   assert.deepEqual(firstWake,{hidden:true,launches:0},'The first OK after idle must only wake the panel, not open the selected video');
   const cancellation=await evaluate(`(function(){
-    var old=TV.launch,oldDismiss=TV.dismissScreensaver,pending=[],dismissed=0;
+    var old=TV.launch,oldDismiss=TV.dismissScreensaver,oldNow=Date.now,pending=[],dismissed=0;
     try {
+      Date.now=function(){return 1234567890000};document.dispatchEvent(new MouseEvent('mousemove'));
       TV.launch=function(id,params,done){pending.push(done)};
       TV.dismissScreensaver=function(){dismissed++};
       FreeMyTV.showSaver();
@@ -459,7 +460,7 @@ try {
       var afterOld=dismissed;
       pending.shift()(true);
       return {afterFocus:afterFocus,afterOld:afterOld};
-    } finally {TV.launch=old;TV.dismissScreensaver=oldDismiss;document.dispatchEvent(new MouseEvent('mousemove'));}
+    } finally {Date.now=oldNow;TV.launch=old;TV.dismissScreensaver=oldDismiss;document.dispatchEvent(new MouseEvent('mousemove'));}
   })()`);
   assert.deepEqual(cancellation,{afterFocus:1,afterOld:1},'Input cancels late saver launches and stale attempts cannot close a newer session');
   assert.deepEqual(errors,[]);

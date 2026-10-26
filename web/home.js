@@ -1459,17 +1459,17 @@
     setClass(body, 'night', (dashboardOn && Prefs.theme() === 'auto') || Data.isNight(Date.now()));
   }
 
-  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverGeneration = 0;
+  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverGeneration = 0, idleGeneration = 0;
   var SAVER_AFTER = IdlePolicy.saverDelay(HomeProfile.config.idleMinutes), nextSaverAttempt = 0;
 
   function showSaver() {
     if (document.hidden) return;
     if (HomeProfile.config.nativeScreensaver) {
-      var origin = idleAt, generation = ++saverGeneration, elapsed = Math.max(0, Date.now() - idleAt);
+      var origin = idleGeneration, generation = ++saverGeneration, elapsed = Math.max(0, Date.now() - idleAt);
       nextSaverAttempt = Date.now() + 30000;
       TV.launch('com.webos.app.screensaver', {idleSource: 'freemytv', idleElapsedMs: elapsed}, function (ok) {
         if (generation !== saverGeneration) return;
-        if (document.hidden || origin !== idleAt) {if (ok) TV.dismissScreensaver();return;}
+        if (document.hidden || origin !== idleGeneration) {if (ok) TV.dismissScreensaver();return;}
         widgetsPaused = ok;
         syncHomeWidgets();
         if (!ok && !document.hidden) toast(trf("Couldn't open {app}.", {app: 'Screensaver'}));
@@ -1522,6 +1522,7 @@
   }
 
   function poke() {
+    idleGeneration++;
     idleAt = Date.now();
     nextSaverAttempt = 0;
     widgetsPaused = false;
@@ -1590,6 +1591,7 @@
   function reset() {
     var zone = dashboardOn && !sheetOpen() && st.zone !== Z.DRAWER ? st.zone : null;
     widgetsPaused = false;
+    idleGeneration++;
     idleAt = Date.now();
     nextSaverAttempt = 0;
     hideSaver();
@@ -1634,6 +1636,7 @@
     }
     widgetsPaused = false;
     syncHomeWidgets();
+    idleGeneration++;
     idleAt = Date.now();
     nextSaverAttempt = 0;
     loadApps(function () { renderShelf(); renderDrawer(); renderCards(); updateFocus(); Data.refresh(); });
