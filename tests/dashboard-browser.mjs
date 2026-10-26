@@ -141,6 +141,7 @@ try {
     await wait(80);
   }
   await togglePresentation('presentation');
+  await wait(300);
   assert.equal(await evaluate("document.body.className.indexOf('cinematic-dashboard')>=0&&document.querySelectorAll('#sky canvas.on').length===1"),true,'Cinematic presentation uses the selected cached artwork');
   await togglePresentation('contextualArtwork');
   assert.equal(await evaluate("document.querySelector('.hero-art').style.backgroundImage===''&&document.querySelectorAll('#sky canvas.on').length===0"),true,'Static presentation cancels and clears contextual artwork');
@@ -283,6 +284,9 @@ try {
   await evaluate('FreeMyTV.back()');
   assert.deepEqual(await evaluate("({zone:FreeMyTV.state.zone,top:document.getElementById('platter').getBoundingClientRect().top})"),{zone:'shelf',top:dockPosition},'One Back reaches the dock without moving it');
   await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(0,1)");
+  await evaluate("document.getElementById('dashboard-scroll').scrollTop=200;FreeMyTV.move(1,0)");
+  assert.equal(await evaluate("(function(){var c=document.querySelector('.video-card.selected').getBoundingClientRect(),v=document.getElementById('dashboard-scroll').getBoundingClientRect();return c.top>=v.top&&c.bottom<=v.bottom})()"),true,'External scroll changes must invalidate retained focus geometry');
+  await evaluate('FreeMyTV.move(-1,0)');
   const focusStampGap=await evaluate("document.querySelector('.video-stamp').getBoundingClientRect().top-document.querySelector('.video-card.selected').getBoundingClientRect().bottom");
   assert.ok(focusStampGap>=1,'Focus outline must not cover the snapshot timestamp; gap='+focusStampGap);
   await evaluate("FreeMyTV.move(0,1)");
@@ -440,9 +444,9 @@ try {
     FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.video=0;
     for(var step=0;step<5;step++)FreeMyTV.move(1,0);await new Promise(function(resolve){setTimeout(resolve,200)});
     var card=document.querySelectorAll('.video-card')[5].getBoundingClientRect(),viewport=document.querySelector('.video-viewport').getBoundingClientRect();FreeMyTV.activate();
-    return {selected:FreeMyTV.state.video,visible:card.left>=viewport.left&&card.right<=viewport.right,params:window.__launchParams[window.__launchParams.length-1]};
+    return {prepared:document.querySelectorAll('.video-card.focus-ready').length,selected:FreeMyTV.state.video,visible:card.left>=viewport.left&&card.right<=viewport.right,params:window.__launchParams[window.__launchParams.length-1]};
   }finally{feed.items=original;document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click()}})()`);
-  assert.deepEqual(videoCarousel,{selected:5,visible:true,params:{contentTarget:'v=VIDEO000006'}},'Scrolling thumbnails must keep the focused video and exact target aligned');
+  assert.deepEqual(videoCarousel,{prepared:4,selected:5,visible:true,params:{contentTarget:'v=VIDEO000006'}},'Scrolling thumbnails must keep the focused video and exact target aligned');
   const missingVideoArt=await evaluate(`(function(){var row=CONFIG.homeProfile.youtubeFeed.items[0],image=row.image,title=row.title,channel=row.channel;try{
     row.image='';row.title='<img src=x onerror=bad()> '+new Array(30).join('Long title ');row.channel=new Array(30).join('Long channel ');
     document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click();

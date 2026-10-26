@@ -58,6 +58,7 @@
 
   /** The 1920 × 1080 stage fills the window (on the TV it already is 1920 × 1080). */
   function fit() {
+    scrollFocusKey = null;
     var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
     stage.style.webkitTransform = stage.style.transform = s === 1 ? '' : 'scale(' + s + ')';
   }
@@ -160,9 +161,10 @@
   var Z = {ACTIONS:'actions', REPORT:'report', DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
   var st = {action:0, zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
+  var ambientTimer = 0;
   var artworkActions = null, previewItem = null, previewSource = '', keyArtworkTimer = 0, keyArtworkPending = false, keyArtworkLong = false, artworkLongTimer = 0;
   var featurePreview = HomeHero.create($('feature-preview'),featureBackdrop);
-  var dashboardScroll = null, dashboardStack = null, dashboardScrollTab = -1;
+  var dashboardScroll = null, dashboardStack = null, dashboardScrollTab = -1, scrollFocusKey = null;
   var pressedArtwork = null;
   var artworkPress = false, artworkRefreshPending = false, artworkPressTimer = 0;
 
@@ -205,6 +207,9 @@
 
   function scrollDashboardFocus() {
     if (!dashboardScroll) return;
+    var key = [st.zone,st.tab,st.dashboard,st.widget,Prefs.version,stage.style.transform,dashboardScroll.scrollTop].join(':');
+    if (scrollFocusKey === key) return;
+    scrollFocusKey = key;
     var content = $('dashboard'), widgets = $('home-widgets');
     var bottom = content.offsetTop + content.offsetHeight;
     if (widgetsVisible()) bottom = Math.max(bottom, widgets.offsetTop + widgets.offsetHeight);
@@ -268,6 +273,7 @@
   }
 
   function focusRows(sheet, index, on) {
+    if (!on && !hasClass(sheet, 'open')) return;
     var rows = sheet.querySelectorAll('.row');
     for (var i = 0; i < rows.length; i++) setClass(rows[i], 'focus', on && i === index);
     var holder = sheet.querySelector('.rows');
@@ -429,14 +435,19 @@
     featurePreview.update(item ? {id:item.id,title:item.title,meta:item.channel || item.episodeTitle || '',presentation:Prefs.presentation(),image:Prefs.contextualArtwork() ? item.background || item.image : ''} : null);
   }
 
-  function featureBackdrop(image) {
+  function featureBackdrop(image, pending) {
     if (!dashboardOn) return;
+    clearTimeout(ambientTimer);
+    if (pending && Prefs.presentation() === 'cinematic' && Prefs.contextualArtwork()) return;
     if (!image || Prefs.presentation() !== 'cinematic' || !Prefs.contextualArtwork()) {
       setClass($('bgA'),'on',false);setClass($('bgB'),'on',false);return;
     }
-    var next = bgFront === 'bgA' ? 'bgB' : 'bgA', canvas = $(next);
-    canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
-    setClass(canvas,'on',true);setClass($(bgFront),'on',false);bgFront=next;
+    // Focus reacts immediately; ambient composition waits for navigation to settle.
+    ambientTimer = setTimeout(function () {
+      if (document.hidden || Prefs.presentation() !== 'cinematic' || !Prefs.contextualArtwork()) return;
+      var canvas = $('bgA');canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+      setClass(canvas,'on',true);setClass($('bgB'),'on',false);
+    },240);
   }
   function videoGeometry() {return Prefs.cardDensity() === 'compact' ? {step:276,visible:4} : {step:356,visible:3};}
   function mediaGeometry() {
@@ -508,6 +519,7 @@
     var first = Math.max(0, st.media - width + 1);
     var selected = focusedArtwork();
     for (var i = 0; i < nodes.length; i++) {
+      setClass(nodes[i], 'focus-ready', dashboardItems().indexOf('media') >= 0 && i >= first && i <= first + width);
       setClass(nodes[i], 'selected', !!selected && selected.source === 'media' && i === st.media);
       var image = nodes[i].querySelector('img');
       if (image && !image.getAttribute('src') && i >= first && i <= first + width && dashboardItems().indexOf('media') >= 0) image.src = image.getAttribute('data-src');
@@ -567,6 +579,7 @@
     var selected = focusedArtwork();
     for (var i = 0; i < videoTrack.children.length; i++) {
       var card = videoTrack.children[i], image = card.querySelector('img');
+      setClass(card, 'focus-ready', dashboardItems().indexOf('youtube') >= 0 && i >= first && i < first + geometry.visible + 1);
       setClass(card, 'selected', !!selected && selected.source === 'youtube' && i === st.video);
       if (image && !image.getAttribute('src') && i >= first && i < first + geometry.visible + 1 && dashboardItems().indexOf('youtube') >= 0) image.src = image.getAttribute('data-src');
     }
@@ -628,6 +641,7 @@
     var first=Math.max(0,st.news-visible+1),show=dashboardItems().indexOf('news')>=0;
     for(var i=0;i<newsTrack.children.length;i++){
       var card=newsTrack.children[i],image=card.querySelector('img');
+      setClass(card,'focus-ready',show&&i>=first&&i<=first+visible);
       setClass(card,'selected',show&&st.zone===Z.DASHBOARD&&dashboardItems()[st.dashboard]==='news'&&i===st.news);
       if(image&&!image.getAttribute('src')&&show&&i>=first&&i<=first+visible)image.src=image.getAttribute('data-src');
     }
@@ -692,6 +706,7 @@
 
   function renderDashboard() {
     if (artworkPress) {artworkRefreshPending = true; return;}
+    scrollFocusKey = null;
     if (artworkActions && (artworkActions.scope !== HomeArrangement.scope(HomeProfile.config,artworkActions.source) || !sourceItems(artworkActions.source).some(function(row){return row.id===artworkActions.id;}))) closeArtworkActions();
     var holder = $('dashboard'), labels = HomeProfile.labels;
     if (!dashboardNodes.youtube) {
@@ -724,7 +739,7 @@
     var visible = dashboardItems();
     for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) dashboardNodes[key].style.display = visible.indexOf(key) >= 0 ? '' : 'none';
     st.dashboard = Math.max(0, Math.min(st.dashboard, visible.length - 1));
-    cards = []; $('cards').innerHTML = ''; backdrop(''); updateFocus();
+    cards = []; $('cards').innerHTML = ''; backdrop(''); scrollFocusKey = null; updateFocus();
   }
 
   var bgUrl = null, bgFront = 'bgA';
