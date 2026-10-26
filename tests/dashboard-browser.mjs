@@ -203,6 +203,7 @@ try {
     if(await evaluate("(function(){var c=document.querySelector('.video-card.selected');return c&&c.getBoundingClientRect().width>c.offsetWidth})()")) break;
     await wait(50);
   }
+  assert.equal(await evaluate("document.querySelector('#feature-preview .hero-title').textContent==='YouTube fixture 0'&&document.getElementById('feature-preview').getBoundingClientRect().bottom<document.getElementById('dashboard-scroll').getBoundingClientRect().top"),true,'Contextual artwork must retain selected identity and reserve space above content');
   const focusedVideo=await evaluate(`(function(){var card=document.querySelector('.video-card.selected'),viewport=document.querySelector('.video-viewport').getBoundingClientRect(),r=card.getBoundingClientRect(),details=document.getElementById('focus-details');return {grown:r.width>card.offsetWidth,inside:r.left>=viewport.left&&r.right<=viewport.right&&r.top>=viewport.top&&r.bottom<=viewport.bottom,details:!!details&&getComputedStyle(details).display!=='none'&&details.textContent.indexOf('YouTube fixture 0')>=0,dockHidden:getComputedStyle(document.getElementById('tiles')).visibility==='hidden'}})()`);
   assert.deepEqual(focusedVideo,{grown:true,inside:true,details:true,dockHidden:true},'Focused artwork must grow without clipping and show its complete details in place of the dock');
   const focusStampGap=await evaluate("document.querySelector('.video-stamp').getBoundingClientRect().top-document.querySelector('.video-card.selected').getBoundingClientRect().bottom");
@@ -216,7 +217,8 @@ try {
   await evaluate(`document.querySelectorAll('.media-card')[1].dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:${pointer.x},clientY:${pointer.y}}))`);
   assert.equal(await evaluate("FreeMyTV.state.media"),0,'Stationary pointer events must not undo remote selection');
   assert.equal(await evaluate("document.getElementById('focus-details').textContent.indexOf('T1 · E2 · 25%')>=0&&document.getElementById('focus-details').textContent.indexOf('Episode fixture')>=0"),true,'Nuvio details retain known episode, title and progress');
-  await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:pointer.x+1,y:pointer.y});
+  const currentPointer=await evaluate("(function(){var r=document.querySelectorAll('.media-card')[1].getBoundingClientRect();return {x:r.left+r.width/2+1,y:r.top+50}})()");
+  await call('Input.dispatchMouseEvent',{type:'mouseMoved',...currentPointer});
   assert.equal(await evaluate("FreeMyTV.state.media===1&&document.getElementById('focus-details').textContent.indexOf('Episode fixture')<0"),true,'A genuine pointer move can select again and clears the previous episode');
   await evaluate("document.querySelector('#buttons button').click()");
   assert.equal(await evaluate("getComputedStyle(document.getElementById('focus-details')).display==='none'&&document.getElementById('focus-details').textContent===''"),true,'Opening controls cancels and clears media details');
@@ -444,8 +446,9 @@ try {
   })()`);
   assert.deepEqual(firstWake,{hidden:true,launches:0},'The first OK after idle must only wake the panel, not open the selected video');
   const cancellation=await evaluate(`(function(){
-    var old=TV.launch,oldDismiss=TV.dismissScreensaver,pending=[],dismissed=0;
+    var old=TV.launch,oldDismiss=TV.dismissScreensaver,oldNow=Date.now,pending=[],dismissed=0;
     try {
+      Date.now=function(){return 1234567890000};document.dispatchEvent(new MouseEvent('mousemove'));
       TV.launch=function(id,params,done){pending.push(done)};
       TV.dismissScreensaver=function(){dismissed++};
       FreeMyTV.showSaver();
@@ -457,7 +460,7 @@ try {
       var afterOld=dismissed;
       pending.shift()(true);
       return {afterFocus:afterFocus,afterOld:afterOld};
-    } finally {TV.launch=old;TV.dismissScreensaver=oldDismiss;document.dispatchEvent(new MouseEvent('mousemove'));}
+    } finally {Date.now=oldNow;TV.launch=old;TV.dismissScreensaver=oldDismiss;document.dispatchEvent(new MouseEvent('mousemove'));}
   })()`);
   assert.deepEqual(cancellation,{afterFocus:1,afterOld:1},'Input cancels late saver launches and stale attempts cannot close a newer session');
   assert.deepEqual(errors,[]);

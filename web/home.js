@@ -152,6 +152,7 @@
   var Z = {REPORT:'report', DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
   var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
+  var featurePreview = HomeHero.create($('feature-preview'));
   var dashboardScroll = null, dashboardStack = null, dashboardScrollTab = -1;
   var artworkPress = false, artworkRefreshPending = false, artworkPressTimer = 0;
 
@@ -226,6 +227,7 @@
     focusVideos();
     focusNews();
     renderFocusDetails();
+    renderFeaturePreview();
     list = $('home-widgets').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.WIDGETS && st.widget === i);
     list = $('tiles').children;
@@ -381,6 +383,18 @@
     var meta = parts.join(' · ');
     setClass(holder, 'long-details', item.title.length > 180 || meta.length > 200);
     if (holder.lastChild.textContent !== meta) holder.lastChild.textContent = meta;
+  }
+
+  function renderFeaturePreview() {
+    var enabled = dashboardOn && ((st.tab === 0 && videoItems.length > 0) || (st.tab === 2 && mediaItems.length > 0));
+    setClass(body, 'preview-layout', enabled);
+    if (!enabled || document.hidden || saverOn || sheetOpen() || st.zone === Z.DRAWER) {featurePreview.update(null);return;}
+    var selected = focusedArtwork(), item = selected && selected.item;
+    if (!item && (st.zone === Z.TOP || st.zone === Z.SHELF)) {
+      var list = st.tab === 0 ? YouTubeFeed.items(HomeProfile.config) : MediaCards.items(HomeProfile.config);
+      item = list[0];
+    }
+    featurePreview.update(item ? {id:item.id,title:item.title,meta:item.channel || item.episodeTitle || '',image:item.background || item.image} : null);
   }
 
   function pointerMoved(event) {
@@ -1445,17 +1459,17 @@
     setClass(body, 'night', (dashboardOn && Prefs.theme() === 'auto') || Data.isNight(Date.now()));
   }
 
-  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverGeneration = 0;
+  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverGeneration = 0, idleGeneration = 0;
   var SAVER_AFTER = IdlePolicy.saverDelay(HomeProfile.config.idleMinutes), nextSaverAttempt = 0;
 
   function showSaver() {
     if (document.hidden) return;
     if (HomeProfile.config.nativeScreensaver) {
-      var origin = idleAt, generation = ++saverGeneration, elapsed = Math.max(0, Date.now() - idleAt);
+      var origin = idleGeneration, generation = ++saverGeneration, elapsed = Math.max(0, Date.now() - idleAt);
       nextSaverAttempt = Date.now() + 30000;
       TV.launch('com.webos.app.screensaver', {idleSource: 'freemytv', idleElapsedMs: elapsed}, function (ok) {
         if (generation !== saverGeneration) return;
-        if (document.hidden || origin !== idleAt) {if (ok) TV.dismissScreensaver();return;}
+        if (document.hidden || origin !== idleGeneration) {if (ok) TV.dismissScreensaver();return;}
         widgetsPaused = ok;
         syncHomeWidgets();
         if (!ok && !document.hidden) toast(trf("Couldn't open {app}.", {app: 'Screensaver'}));
@@ -1508,6 +1522,7 @@
   }
 
   function poke() {
+    idleGeneration++;
     idleAt = Date.now();
     nextSaverAttempt = 0;
     widgetsPaused = false;
@@ -1576,6 +1591,7 @@
   function reset() {
     var zone = dashboardOn && !sheetOpen() && st.zone !== Z.DRAWER ? st.zone : null;
     widgetsPaused = false;
+    idleGeneration++;
     idleAt = Date.now();
     nextSaverAttempt = 0;
     hideSaver();
@@ -1609,6 +1625,7 @@
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
+      featurePreview.update(null);
       releaseArtworkPress();
       hideSaver();
       if (calendarOn || st.zone === Z.REPORT) back();
@@ -1619,6 +1636,7 @@
     }
     widgetsPaused = false;
     syncHomeWidgets();
+    idleGeneration++;
     idleAt = Date.now();
     nextSaverAttempt = 0;
     loadApps(function () { renderShelf(); renderDrawer(); renderCards(); updateFocus(); Data.refresh(); });

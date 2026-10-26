@@ -31,6 +31,7 @@ if [ "$what" = all ] || [ "$what" = web ]; then
   node --test tests/calendar-feed.test.cjs
   node --test tests/nuvio-source.test.cjs
   node --test tests/media-cards.test.cjs
+  node --test tests/hero.test.cjs
   node --test tests/dashboard.test.cjs
   node --test tests/disney-mapping.test.cjs
   node --test tests/native-saver.test.cjs
