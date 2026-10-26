@@ -112,6 +112,16 @@ try {
   assert.deepEqual(await evaluate("Array.prototype.map.call(document.querySelectorAll('#tabs .tab'),function(x){return x.textContent})"),['YouTube','Notícias','Mídia','Infos']);
   assert.equal(await evaluate('TV.name'), 'webos', 'Browser must exercise the injected webOS bridge');
   const expected = await evaluate('CONFIG.homeProfile.items.map(function(x){return x.id})');
+  assert.deepEqual(await evaluate("Array.prototype.map.call(document.querySelectorAll('#tiles .dock-label'),function(x){return x.textContent})"),['YouTube','Nuvio','Receiver','PS5'],'Every dock icon must retain its app/input name');
+  assert.deepEqual(await evaluate("Array.prototype.map.call(document.querySelectorAll('#tiles .tile'),function(x){return x.getAttribute('aria-label')})"),await evaluate('CONFIG.homeProfile.items.map(function(x){return x.title})'),'Dock aliases must preserve the original configured name for accessibility');
+  const dockGeometry=await evaluate(`(function(){var bar=document.getElementById('platter').getBoundingClientRect();return {compact:bar.height<=160,inside:bar.bottom<=1040,cards:Array.prototype.every.call(document.querySelectorAll('#tiles .tile'),function(tile){var r=tile.getBoundingClientRect(),label=tile.querySelector('.dock-label').getBoundingClientRect();return tile.offsetWidth<=180&&tile.offsetHeight<=120&&label.bottom<r.bottom})}})()`);
+  assert.deepEqual(dockGeometry,{compact:true,inside:true,cards:true},'The smaller dock and its labels must fit inside the safe screen area');
+  const dockFallback=await evaluate(`(function(){var tile=document.querySelector('#tiles .tile'),img=tile.querySelector('img');img.dispatchEvent(new Event('error'));return {label:tile.querySelector('.dock-label').textContent,icon:getComputedStyle(tile.querySelector('.dock-symbol')).visibility,removed:!tile.querySelector('img'),id:tile.getAttribute('data-app-id')}})()`);
+  assert.deepEqual(dockFallback,{label:'YouTube',icon:'visible',removed:true,id:expected[0]},'A failed icon must retain a visible fallback, name and launch identity');
+  const dockLaunches=await evaluate(`(function(){var before=window.__launches.length;Array.prototype.forEach.call(document.querySelectorAll('#tiles .tile'),function(tile){tile.click()});return window.__launches.slice(before)})()`);
+  assert.deepEqual(dockLaunches,expected,'Named dock buttons must open only their exact configured app/input IDs');
+  const failedDock=await evaluate(`(function(){window.__failLaunch=true;document.querySelector('#tiles .tile').click();window.__failLaunch=false;return {index:FreeMyTV.state.shelf,label:document.querySelector('.tile.focus .dock-label').textContent,toast:document.getElementById('toast').className.indexOf('on')>=0}})()`);
+  assert.deepEqual(failedDock,{index:0,label:'YouTube',toast:true},'A failed dock launch must retain its selected app and show feedback');
   const views = [['youtube','media','news'],['news'],['media','news'],[]];
   for(let tab=0;tab<4;tab++) {
     await evaluate(`document.querySelectorAll('#tabs .tab')[${tab}].click()`);

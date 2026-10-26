@@ -671,6 +671,16 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .dashboard-home.youtube-artwork #home-widgets, .dashboard-home.media-artwork #home-widgets { top: 650px; }
 .youtube-artwork #platter, .youtube-artwork #tiles, .media-artwork #platter, .media-artwork #tiles { -webkit-transform: translateY(126px); transform: translateY(126px); }
 
+/* A fixed compact dock keeps the same four app/input identities on every tab. */
+.dashboard-home #platter, .dashboard-home #tiles { -webkit-transform: none; transform: none; }
+.dashboard-home #platter { border-radius: 30px; background: #101012; box-shadow: inset 0 0 0 1px #29292c; }
+.dashboard-home .tile { border: 1px solid #333; box-sizing: border-box; border-radius: 18px; background: #18181a; box-shadow: none; color: #ccc; }
+.dashboard-home .tile.focus { border-color: #ddd; box-shadow: none; -webkit-transform: scale(1.06); transform: scale(1.06); }
+.dashboard-home .tile::after { display: none; }
+.dashboard-home .tile img { top: 38px; width: 56px; height: 56px; max-width: none; max-height: none; object-fit: contain; }
+.dock-symbol { position: absolute; left: 50%; top: 38px; -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); }
+.dock-label { position: absolute; left: 10px; right: 10px; bottom: 10px; font-size: 20px; line-height: 26px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* A small focus lift fits inside reserved gutters instead of cropping the selected artwork. */
 .media-viewport, .video-viewport { top: 44px; height: 272px; }
 .media-track, .video-track { top: 6px; margin-left: 8px; }

@@ -598,15 +598,16 @@
   // MARK: - Shelf
 
   function renderShelf() {
-    var n = shelf.length, gap = 48, pad = 40;
-    // 16:9 tiles, as on Android: never taller than 126, and the glass keeps its bottom edge.
+    var n = shelf.length, gap = dashboardOn ? 24 : 48, pad = dashboardOn ? 20 : 40;
+    // Legacy uses Android's 16:9 tiles; the dashboard reserves a compact named dock.
     var tw = Math.min(126 * 16 / 9, (1760 - Math.max(0, n - 1) * gap) / Math.max(1, n)), th = tw * 9 / 16;
+    if (dashboardOn) {tw = Math.min(168, tw); th = 120;}
     var width = n * tw + Math.max(0, n - 1) * gap, left = (1920 - width) / 2;
     var platter = $('platter');
     platter.style.display = n ? '' : 'none';
     platter.style.left = (left - pad) + 'px';
     platter.style.width = (width + 2 * pad) + 'px';
-    platter.style.top = (814 + 126 - th - (dashboardOn ? 76 : 0)) + 'px';
+    platter.style.top = (dashboardOn ? 866 : 814 + 126 - th) + 'px';
     platter.style.height = (th + 2 * pad) + 'px';
     $('quotes').style.right = dashboardOn ? '' : (1920 - left - width) + 'px';
     var tiles = $('tiles');
@@ -615,13 +616,33 @@
       var t = el('div', 'tile', tiles);
       t.setAttribute('data-app-id', shelf[i].id);
       t.style.left = (left + i * (tw + gap)) + 'px';
-      t.style.top = (854 + 126 - th - (dashboardOn ? 76 : 0)) + 'px';
+      t.style.top = (dashboardOn ? 886 : 854 + 126 - th) + 'px';
       t.style.width = tw + 'px';
       t.style.height = th + 'px';
-      face(shelf[i], t, wordFit(shelf[i].title, tw, 30));
+      if (dashboardOn) dockFace(shelf[i], t);
+      else face(shelf[i], t, wordFit(shelf[i].title, tw, 30));
       hover(t, Z.SHELF, i);
     }
     st.shelf = Math.min(st.shelf, Math.max(0, n - 1));
+  }
+
+  function dockFace(app, box) {
+    var input = /^com\.webos\.app\.hdmi[1-4]$/.test(app.id);
+    var labels = {'com.cobalt.youtube.adfree': 'YouTube', 'space.nuvio.webos': 'Nuvio', 'com.webos.app.hdmi2': 'Receiver', 'com.webos.app.hdmi3': 'PS5'};
+    var symbol = input ? 'hdmi' : 'apps';
+    if (app.id === 'com.webos.app.hdmi2') symbol = 'speaker';
+    if (app.id === 'com.webos.app.hdmi3') symbol = 'gamepad';
+    var fallback = sym(symbol, box, 52);
+    fallback.className += ' dock-symbol';
+    if (app.icon && !input) {
+      var image = el('img', '', box);
+      image.onload = function () {if (image.parentNode === box) fallback.style.visibility = 'hidden';};
+      image.onerror = function () {if (image.parentNode === box) box.removeChild(image); fallback.style.visibility = '';};
+      image.src = app.icon;
+    }
+    el('div', 'dock-label', box, labels[app.id] || app.title);
+    box.setAttribute('role', 'button');
+    box.setAttribute('aria-label', app.title);
   }
 
   // MARK: - Drawer
