@@ -543,6 +543,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .widget-title { font-size: 28px; font-weight: 600; color: #bbb; }
 .widget-status { font-size: 26px; margin-top: 8px; }
 .widget-detail { font-size: 22px; line-height: 30px; margin-top: 7px; white-space: pre-line; overflow: hidden; }
+.widget-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Private four-tab dashboard: videos/media, news, then persistent info widgets. */
 #dashboard { display: none; position: absolute; left: 80px; top: 242px; width: 1760px; height: 335px; }
@@ -564,15 +565,16 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .dashboard-news .dashboard-subtitle { font-size: 22px; line-height: 26px; margin-top: 6px; }
 #dashboard[data-view="news"] .dashboard-news { top: 0; height: 335px; padding-top: 28px; }
 #dashboard[data-view="media"] .dashboard-media { left: 0; width: 1760px; }
-.dashboard-home #home-widgets { top: 600px; height: 185px; }
-.dashboard-home .home-widget { width: 425px; height: 185px; padding: 16px 20px; box-sizing: border-box; }
+.dashboard-home #home-widgets { top: 600px; height: 160px; }
+.dashboard-home .home-widget { width: 425px; height: 160px; padding: 14px 20px; box-sizing: border-box; border-width: 1px; border-radius: 16px; background: #111; }
 .dashboard-home .home-widget + .home-widget { left: 445px; }
 .dashboard-home .home-widget + .home-widget + .home-widget { left: 890px; }
 .dashboard-home .home-widget + .home-widget + .home-widget + .home-widget { left: 1335px; }
-.dashboard-home .widget-title { font-size: 24px; }
-.dashboard-home .widget-status { font-size: 21px; }
-.dashboard-home .widget-detail { font-size: 18px; line-height: 25px; }
-.dashboard-home .widget-status, .dashboard-home .widget-detail { overflow: hidden; text-overflow: ellipsis; }
+.dashboard-home .home-widget.focus { border-color: #ddd; background: #1c1c1e; }
+.dashboard-home .widget-title { font-size: 22px; line-height: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dashboard-home .widget-status { margin-top: 4px; font-size: 20px; line-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Keep the same two detail rows for unavailable feeds and long calendar titles. */
+.dashboard-home .widget-detail { margin-top: 6px; height: 48px; font-size: 18px; line-height: 24px; word-wrap: break-word; }
 .dashboard-home #dashboard[data-view="info"] + #home-widgets { top: 300px; }
 
 /* Bounded, still artwork carousel; selected cards retain their title on image failure. */

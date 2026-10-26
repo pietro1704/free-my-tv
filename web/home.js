@@ -663,6 +663,7 @@
 
   function renderPanels() {
     renderDashboardWeather();
+    renderCalendarWidget();
     var d = $('drawer');
     var old = d.querySelectorAll('.panel');
     for (var o = 0; o < old.length; o++) d.removeChild(old[o]);
@@ -878,18 +879,24 @@
     var s = state.lab, b = state.brew, labels = HomeProfile.labels;
     function number(n, unit) {return typeof n === 'number' && isFinite(n) ? Math.round(n) + unit : '—';}
     widgetNodes.arch.status.textContent = s.loading ? labels.waiting || '…' : s.available ? labels.online || 'OK' : labels.offline || '—';
-    widgetNodes.arch.detail.textContent = s.available ? 'CPU ' + number(s.cpuPercent, '%') + ' · RAM ' + number(s.usedMB, '') + '/' + number(s.totalMB, ' MB') + '\nDocker ' + number(s.dockerRunning, '') + '/' + number(s.dockerTotal, '') + ' · ' + number(s.temperature, ' °C') : '—';
+    widgetDetail(widgetNodes.arch.detail, s.available ? ['CPU ' + number(s.cpuPercent, '%') + ' · RAM ' + number(s.usedMB, '') + '/' + number(s.totalMB, ' MB'), 'Docker ' + number(s.dockerRunning, '') + '/' + number(s.dockerTotal, '') + ' · ' + number(s.temperature, ' °C')] : ['—']);
     widgetNodes.webosbrew.status.textContent = b.loading ? labels.waiting || '…' : !b.available ? labels.offline || '—' : (b.updates.length ? b.updates.length + ' ' + (labels.updates || 'updates') : labels.upToDate || 'OK');
-    widgetNodes.webosbrew.detail.textContent = b.available ? b.updates.slice(0, 2).map(function (app) {return app.title + ' · ' + app.installed + ' → ' + app.latest;}).join('\n') || (b.checked + ' ' + (labels.appsChecked || 'apps')) : '—';
+    var updates = b.available ? b.updates.slice(0, 2).map(function (app) {return app.title + ' · ' + app.installed + ' → ' + app.latest;}) : [];
+    widgetDetail(widgetNodes.webosbrew.detail, updates.length ? updates : [b.available ? b.checked + ' ' + (labels.appsChecked || 'apps') : '—']);
     renderDashboardWeather();
     renderCalendarWidget();
+  }
+
+  function widgetDetail(node, rows) {
+    node.textContent = '';
+    for (var i = 0; i < rows.length && i < 2; i++) el('div', 'widget-line', node, rows[i]);
   }
 
   function renderCalendarWidget() {
     if (!widgetNodes || !widgetNodes.calendar) return;
     var labels = HomeProfile.labels, calendar = CalendarFeed.view(HomeProfile.config);
     widgetNodes.calendar.status.textContent = labels.calendarScope || 'Gmail · holidays';
-    widgetNodes.calendar.detail.textContent = calendar.available ? calendar.preview.map(function(row){return row.label + ' · ' + row.value;}).join('\n') : calendar.stale ? labels.calendarStale || 'Atualização necessária' : labels.calendarPending || 'Calendar not connected';
+    widgetDetail(widgetNodes.calendar.detail, calendar.available ? calendar.preview.map(function(row){return row.label + ' · ' + row.value;}) : [calendar.stale ? labels.calendarStale || 'Atualização necessária' : labels.calendarPending || 'Calendar not connected']);
     if (calendarOn && !calendar.available) {closeSheets();st.zone = Z.WIDGETS;st.widget = 2;updateFocus();}
   }
 
@@ -904,10 +911,11 @@
     if (!widgetNodes.weather) return;
     var days = Data.weather && Data.weather.days || [], labels = HomeProfile.labels;
     widgetNodes.weather.status.textContent = Data.city || '—';
-    widgetNodes.weather.detail.textContent = days.slice(0, 2).map(function (day, i) {
+    var rows = days.slice(0, 2).map(function (day, i) {
       function n(value, suffix) {return typeof value === 'number' && isFinite(value) ? Math.round(value) + suffix : '—';}
       return (i ? labels.tomorrow || 'Tomorrow' : labels.today || 'Today') + ' · ' + (day.min === null ? '—' : Data.degrees(day.min)) + '–' + (day.max === null ? '—' : Data.degrees(day.max)) + ' · ' + n(day.rain, '%');
-    }).join('\n') || labels.offline || '—';
+    });
+    widgetDetail(widgetNodes.weather.detail, rows.length ? rows : [labels.offline || '—']);
   }
 
   function openHomelab() {
