@@ -121,6 +121,40 @@ try {
   assert.deepEqual(await evaluate("Array.prototype.map.call(document.querySelectorAll('#tabs .tab'),function(x){return x.textContent})"),['YouTube','Notícias','Mídia','Infos']);
   assert.equal(await evaluate('TV.name'), 'webos', 'Browser must exercise the injected webOS bridge');
   const expected = await evaluate('CONFIG.homeProfile.items.map(function(x){return x.id})');
+  const pointerCard=await evaluate("(function(){var r=document.querySelectorAll('.video-card')[1].getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+40}})()");
+  await call('Input.dispatchMouseEvent',{type:'mouseMoved',...pointerCard});
+  await wait(180);
+  const pointerLaunchBefore=await evaluate('window.__launches.length');
+  const pointerVideoId=await evaluate('YouTubeFeed.items(HomeProfile.config)[1].id');
+  await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,clickCount:1,...pointerCard});
+  await evaluate('Data.settingsChanged()');
+  await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,clickCount:1,...pointerCard});
+  await wait(40);
+  assert.deepEqual(await evaluate('({apps:window.__launches.slice('+pointerLaunchBefore+'),params:window.__launchParams[window.__launchParams.length-1]})'),{apps:['com.cobalt.youtube.adfree'],params:{contentTarget:'v='+pointerVideoId}},'A data refresh between pointer press and release must not swallow the chosen video click');
+  const pointerTitle=await evaluate('CONFIG.homeProfile.youtubeFeed.items.filter(function(x){return x.id==='+JSON.stringify(pointerVideoId)+'})[0].title');
+  for(const cancelledBy of ['outside','blur']) {
+    await call('Input.dispatchMouseEvent',{type:'mouseMoved',...pointerCard});
+    await wait(180);
+    const before=await evaluate('window.__launches.length');
+    await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,clickCount:1,...pointerCard});
+    await evaluate('CONFIG.homeProfile.youtubeFeed.items.filter(function(x){return x.id==='+JSON.stringify(pointerVideoId)+'})[0].title="Updated after '+cancelledBy+'";Data.settingsChanged()');
+    if(cancelledBy==='blur') await evaluate("window.dispatchEvent(new Event('blur'))");
+    await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,clickCount:1,x:10,y:10});
+    await wait(40);
+    assert.deepEqual(await evaluate('({launches:window.__launches.length-'+before+',updated:document.querySelectorAll(".video-name")[1].textContent})'),{launches:0,updated:'Updated after '+cancelledBy},'Cancelled pointer gestures must not launch and must release deferred updates');
+  }
+  await evaluate('CONFIG.homeProfile.youtubeFeed.items.filter(function(x){return x.id==='+JSON.stringify(pointerVideoId)+'})[0].title='+JSON.stringify(pointerTitle)+';Data.settingsChanged()');
+  await call('Input.dispatchMouseEvent',{type:'mouseMoved',...pointerCard});
+  await wait(180);
+  const withdrawnPointerBefore=await evaluate('window.__launches.length');
+  await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,clickCount:1,...pointerCard});
+  await evaluate('CONFIG.homeProfile.youtubeFeed.accountConfirmed=false;Data.settingsChanged()');
+  await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,clickCount:1,...pointerCard});
+  await wait(40);
+  assert.deepEqual(await evaluate('({launches:window.__launches.length-'+withdrawnPointerBefore+',cards:document.querySelectorAll(".video-card").length})'),{launches:0,cards:0},'Withdrawing the account during a press must cancel the launch and remove stale cards');
+  await evaluate('CONFIG.homeProfile.youtubeFeed.accountConfirmed=true;Data.settingsChanged()');
+  await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:10,y:10});
+  await evaluate("FreeMyTV.state.zone='shelf';FreeMyTV.state.shelf=0;FreeMyTV.move(-1,0)");
   assert.equal(await evaluate("!!document.getElementById('dashboard-scroll')"),true,'Dashboard content needs its own vertical viewport below the fixed header');
   assert.deepEqual(await evaluate("Array.prototype.map.call(document.querySelectorAll('#tiles .dock-label'),function(x){return x.textContent})"),['YouTube','Nuvio','Receiver','PS5'],'Every dock icon must retain its app/input name');
   assert.deepEqual(await evaluate("Array.prototype.map.call(document.querySelectorAll('#tiles .tile'),function(x){return x.getAttribute('aria-label')})"),await evaluate('CONFIG.homeProfile.items.map(function(x){return x.title})'),'Dock aliases must preserve the original configured name for accessibility');
@@ -160,6 +194,10 @@ try {
   assert.deepEqual(emptyMediaFocus,{underline:true,background:'rgba(0, 0, 0, 0)',cards:0},'Disconnected media must retain a visible focus cue without a large highlighted box');
   await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(0,1)");
   await wait(200);
+  for(let n=0;n<10;n++) {
+    if(await evaluate("(function(){var c=document.querySelector('.video-card.selected');return c&&c.getBoundingClientRect().width>c.offsetWidth})()")) break;
+    await wait(50);
+  }
   const focusedVideo=await evaluate(`(function(){var card=document.querySelector('.video-card.selected'),viewport=document.querySelector('.video-viewport').getBoundingClientRect(),r=card.getBoundingClientRect(),details=document.getElementById('focus-details');return {grown:r.width>card.offsetWidth,inside:r.left>=viewport.left&&r.right<=viewport.right&&r.top>=viewport.top&&r.bottom<=viewport.bottom,details:!!details&&getComputedStyle(details).display!=='none'&&details.textContent.indexOf('YouTube fixture 0')>=0,dockHidden:getComputedStyle(document.getElementById('tiles')).visibility==='hidden'}})()`);
   assert.deepEqual(focusedVideo,{grown:true,inside:true,details:true,dockHidden:true},'Focused artwork must grow without clipping and show its complete details in place of the dock');
   const focusStampGap=await evaluate("document.querySelector('.video-stamp').getBoundingClientRect().top-document.querySelector('.video-card.selected').getBoundingClientRect().bottom");

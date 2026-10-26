@@ -153,6 +153,32 @@
   var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
   var dashboardScroll = null, dashboardStack = null, dashboardScrollTab = -1;
+  var artworkPress = false, artworkRefreshPending = false, artworkPressTimer = 0;
+
+  function releaseArtworkPress() {
+    if (!artworkPress) return;
+    artworkPress = false;
+    clearTimeout(artworkPressTimer);
+    if (artworkRefreshPending) {
+      artworkRefreshPending = false;
+      // Mouseup is followed by click in the same task; retain its original target until then.
+      setTimeout(function () {if (!document.hidden) renderDashboard();}, 0);
+    }
+  }
+
+  function beginArtworkPress(event) {
+    if (!dashboardOn || event.button !== 0 || saverOn || sheetOpen()) return;
+    var node = event.target;
+    while (node && node !== $('dashboard')) {
+      if (hasClass(node, 'video-card') || hasClass(node, 'media-card') || hasClass(node, 'news-card')) {
+        artworkPress = true;
+        clearTimeout(artworkPressTimer);
+        artworkPressTimer = setTimeout(releaseArtworkPress, 5000);
+        return;
+      }
+      node = node.parentNode;
+    }
+  }
 
   function initDashboardScroll() {
     if (!dashboardOn) return;
@@ -560,6 +586,7 @@
   }
 
   function renderDashboard() {
+    if (artworkPress) {artworkRefreshPending = true; return;}
     var holder = $('dashboard'), labels = HomeProfile.labels;
     if (!dashboardNodes.youtube) {
       var sources = ['youtube', 'media', 'news'];
@@ -1493,6 +1520,7 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    releaseArtworkPress();
     if (poke()) { e.preventDefault(); return; }   // the first press only wakes the screen
     if (k === TV.keys.left) move(-1, 0);
     else if (k === TV.keys.right) move(1, 0);
@@ -1504,6 +1532,10 @@
     e.preventDefault();
   });
   document.addEventListener('mousemove', function (event) { pointerX = event.clientX; pointerY = event.clientY; poke(); });
+  document.addEventListener('mousedown', beginArtworkPress, true);
+  document.addEventListener('mouseup', releaseArtworkPress, true);
+  document.addEventListener('pointercancel', releaseArtworkPress, true);
+  window.addEventListener('blur', releaseArtworkPress);
 
   // MARK: - Start
 
@@ -1573,6 +1605,7 @@
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
+      releaseArtworkPress();
       hideSaver();
       if (diagnosticsOn || homelabOn || calendarOn || st.zone===Z.REPORT) closeSheets();
       stopDiagnostics();
