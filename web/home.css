@@ -775,3 +775,32 @@ body.dashboard-home.night, .dashboard-home.night #sky { background: #000; }
 @media (prefers-reduced-motion: reduce) { .dashboard-home #tiles { -webkit-transition: none; transition: none; } }
 
 .dashboard-home #feature-preview { height: 204px; }
+
+.dashboard-home .video-card { width: 344px; }
+.dashboard-home #dashboard[data-view="youtube"] .media-card { width: 248px; }
+
+/* Presentation choices keep geometry and motion bounded on older TV GPUs. */
+.dashboard-home.cinematic-dashboard.night #sky .night { display: block; background: linear-gradient(#182030,#030407); }
+.dashboard-home.cinematic-dashboard.night #sky canvas { display: block; }
+.dashboard-home.cinematic-dashboard.night #sky canvas.on { opacity: 0.18; }
+.cinematic-dashboard .hero-shade { background: linear-gradient(90deg, #121824 20%, rgba(18,24,36,0.86) 55%, rgba(18,24,36,0.08)); }
+.dashboard-home.compact-cards .video-card { width: 264px; height: 244px; }
+.dashboard-home.compact-cards #dashboard[data-view="youtube"] .media-card { width: 160px; height: 244px; }
+.dashboard-home.compact-cards #dashboard[data-view="media"] .media-card { width: 120px; height: 244px; }
+.dashboard-home.strong-focus .selected { border-color: #fff; box-shadow: 0 0 0 2px #fff, 0 8px 20px rgba(255,255,255,0.1); }
+.dashboard-home.reduced-motion #home, .dashboard-home.reduced-motion #drawer,
+.dashboard-home.reduced-motion #top, .dashboard-home.reduced-motion #sky canvas,
+.dashboard-home.reduced-motion #tiles, .dashboard-home.reduced-motion .tab,
+.dashboard-home.reduced-motion .round, .dashboard-home.reduced-motion .key,
+.dashboard-home.reduced-motion .tile, .dashboard-home.reduced-motion .video-card,
+.dashboard-home.reduced-motion .media-card, .dashboard-home.reduced-motion .news-card,
+.dashboard-home.reduced-motion .box .rows { -webkit-transition: none; transition: none; }
+body.dashboard-home.reduced-motion .selected, body.dashboard-home.reduced-motion .pressed,
+body.dashboard-home.reduced-motion .tile.focus, body.dashboard-home.reduced-motion .tab.focus,
+body.dashboard-home.reduced-motion .round.focus { -webkit-transform: none; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-home #sky canvas { -webkit-transition: none; transition: none; }
+  body.dashboard-home .selected, body.dashboard-home .pressed,
+  body.dashboard-home .tile.focus, body.dashboard-home .tab.focus,
+  body.dashboard-home .round.focus, body.dashboard-home .key.focus { -webkit-transform: none; transform: none; }
+}

@@ -32,6 +32,7 @@ if [ "$what" = all ] || [ "$what" = web ]; then
   node --test tests/nuvio-source.test.cjs
   node --test tests/media-cards.test.cjs
   node --test tests/arrangement.test.cjs
+  node --test tests/presentation.test.cjs
   node --test tests/hero.test.cjs
   node --test tests/dashboard.test.cjs
   node --test tests/disney-mapping.test.cjs
