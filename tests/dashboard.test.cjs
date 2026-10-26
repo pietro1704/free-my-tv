@@ -24,3 +24,8 @@ test('source launch identities are exact and cannot substitute a different playe
  assert.equal(d.app(config,'youtube').id,'custom.adfree');assert.equal(d.app(config,'media').id,'space.nuvio.webos');
  assert.equal(d.app(config,'prime'),null);assert.equal(d.app({...config,youtubeApp:'missing'},'youtube'),null);assert.equal(d.app(null,'media'),null);
 });
+
+test('cinema layout separates content tabs from news and information',()=>{
+ const d=dashboard();assert.deepEqual(plain(d.items(0,'cinema')),['youtube','media']);assert.deepEqual(plain(d.items(2,'cinema')),['media']);assert.deepEqual(plain(d.items(1,'cinema')),['news']);assert.deepEqual(plain(d.items(3,'cinema')),[]);
+ assert.equal(d.next(0,1,0,1,'cinema').zone,'widgets');
+});

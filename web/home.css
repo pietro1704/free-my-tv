@@ -745,3 +745,12 @@ body.dashboard-home.night, .dashboard-home.night #sky { background: #000; }
 .dashboard-home .media-card, .dashboard-home .video-card { border-radius: 12px; border-color: #29292c; }
 .dashboard-home .media-card.selected, .dashboard-home .video-card.selected { border-color: #eee; box-shadow: 0 0 0 1px #aaa, 0 8px 18px rgba(0,0,0,0.35); -webkit-transform: scale(1.04); transform: scale(1.04); }
 .dashboard-home .video-card.pressed, .dashboard-home .media-card.pressed, .dashboard-home .news-card.pressed { -webkit-transform: scale(0.98); transform: scale(0.98); opacity: 0.8; }
+
+/* Entertainment, news and utilities have their own destinations. */
+.cinema-layout #home-widgets, .cinema-layout #quotes { display: none; }
+.cinema-layout.info-layout #home-widgets, .cinema-layout.info-layout #quotes { display: block; }
+.cinema-layout #dashboard { height: 380px; }
+.cinema-layout #dashboard[data-view="youtube"] .media-card { height: 228px; }
+.cinema-layout #dashboard[data-view="youtube"] .media-viewport { height: 248px; }
+.cinema-layout #dashboard[data-view="youtube"] .media-name { font-size: 20px; line-height: 24px; height: 48px; }
+.cinema-layout .video-stamp, .cinema-layout .media-stamp { display: none; }

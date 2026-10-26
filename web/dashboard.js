@@ -2,19 +2,23 @@
 var HomeDashboard = (function () {
   'use strict';
   var tabs = ['youtube', 'news', 'media', 'info'];
-  function rows(tab) {
+  function rows(tab, layout) {
+    if (layout === 'cinema') {
+      if (tab === 0) return [['youtube', 'media']];
+      if (tab === 2) return [['media']];
+    }
     if (tab === 0) return [['youtube', 'media'], ['news']];
     if (tab === 1) return [['news']];
     if (tab === 2) return [['media'], ['news']];
     return [];
   }
-  function items(tab) {
-    var out = [], r = rows(tab);
+  function items(tab, layout) {
+    var out = [], r = rows(tab, layout);
     for (var i = 0; i < r.length; i++) out = out.concat(r[i]);
     return out;
   }
-  function next(tab, index, dx, dy) {
-    var r = rows(tab), offset = 0;
+  function next(tab, index, dx, dy, layout) {
+    var r = rows(tab, layout), offset = 0;
     for (var y = 0; y < r.length; y++) {
       if (index >= offset && index < offset + r[y].length) {
         var x = index - offset;

@@ -45,6 +45,7 @@ var Prefs = (function () {
     version: 0,
     language: function () { return pick('language', CONFIG.language || 'auto'); },
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
+    dashboardLayout: function () { return pick('dashboardLayout', 'cinema') === 'classic' ? 'classic' : 'cinema'; },
     theme: function () { return pick('theme', 'auto'); },
     weather: function () { return pick('weather', true); },
     quotes: function () { return pick('quotes', CONFIG.showCrypto !== false); },

@@ -89,6 +89,19 @@ try {
     assert.deepEqual(errors,[]);
     console.log('PASS: legacy three-tab home, two widgets, diagnostics and chosen app discovery');
   } else {
+  assert.equal(await evaluate('Prefs.dashboardLayout()'),'cinema','New dashboards default to separated content destinations');
+  for(const [tab,panels] of [[0,['youtube','media']],[1,['news']],[2,['media']],[3,[]]]) {
+    await evaluate('document.querySelectorAll("#tabs .tab")['+tab+'].click()');
+    assert.deepEqual(await evaluate("Array.prototype.filter.call(document.querySelectorAll('#dashboard [data-panel]'),function(n){return getComputedStyle(n).display!=='none'}).map(function(n){return n.getAttribute('data-panel')})"),panels);
+    assert.equal(await evaluate("getComputedStyle(document.getElementById('home-widgets')).display!=='none'"),tab===3,'Information widgets belong to Info');
+  }
+  await evaluate("document.querySelectorAll('#tabs .tab')[0].click();FreeMyTV.move(0,1);FreeMyTV.move(0,1)");
+  assert.equal(await evaluate('FreeMyTV.state.zone'),'shelf','Down from content skips hidden news and utilities');
+  await evaluate('FreeMyTV.move(0,-1)');
+  assert.equal(await evaluate('FreeMyTV.state.zone'),'dashboard','Up from dock returns to visible content');
+  const hiddenWidgetLaunches=await evaluate("(function(){var before=window.__launches.length;document.querySelector('.home-widget').click();return window.__launches.length-before})()");
+  assert.equal(hiddenWidgetLaunches,0,'Hidden utilities cannot be activated');
+  await evaluate("Prefs.set('dashboardLayout','classic');Data.settingsChanged();FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(-1,0)");
   assert.equal(await evaluate("document.querySelectorAll('#buttons button').length"),1,'Dashboard header must have one controls entry');
   const header=await evaluate(`(function(){var title=document.getElementById('title').getBoundingClientRect(),tabs=document.getElementById('tabs').getBoundingClientRect(),button=document.querySelector('#buttons button').getBoundingClientRect(),content=document.getElementById('dashboard').getBoundingClientRect();return {compact:title.height<=40,sameRow:Math.abs(title.top-tabs.top)<25,separate:title.right<tabs.left&&tabs.right<button.left,above:Math.max(title.bottom,tabs.bottom,button.bottom)<content.top}})()`);
   assert.deepEqual(header,{compact:true,sameRow:true,separate:true,above:true});

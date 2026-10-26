@@ -144,6 +144,8 @@
   // MARK: - Focus
 
   var dashboardOn = !!HomeProfile.config.dashboard;
+  function dashboardItems() {return HomeDashboard.items(st.tab, Prefs.dashboardLayout());}
+  function widgetsVisible() {return widgetsOn && (!dashboardOn || Prefs.dashboardLayout() === 'classic' || st.tab === 3);}
   function tabCount() {return dashboardOn ? 4 : 3;}
   function topButtonCount() {return dashboardOn ? 1 : 3;}
   var dashboardNodes = {}, mediaItems = [], mediaTrack = null, newsItems = [], videoItems = [], videoTrack = null;
@@ -196,12 +198,12 @@
     if (!dashboardScroll) return;
     var content = $('dashboard'), widgets = $('home-widgets');
     var bottom = content.offsetTop + content.offsetHeight;
-    if (widgetsOn) bottom = Math.max(bottom, widgets.offsetTop + widgets.offsetHeight);
+    if (widgetsVisible()) bottom = Math.max(bottom, widgets.offsetTop + widgets.offsetHeight);
     var height = (bottom + 12) + 'px';
     if (dashboardStack.style.height !== height) dashboardStack.style.height = height;
     if (dashboardScrollTab !== st.tab || st.zone === Z.TOP) dashboardScroll.scrollTop = 0;
     dashboardScrollTab = st.tab;
-    var target = st.zone === Z.WIDGETS ? widgets.children[st.widget] : st.zone === Z.DASHBOARD ? dashboardNodes[HomeDashboard.items(st.tab)[st.dashboard]] : null;
+    var target = st.zone === Z.WIDGETS ? widgets.children[st.widget] : st.zone === Z.DASHBOARD ? dashboardNodes[dashboardItems()[st.dashboard]] : null;
     if (!target || target.offsetHeight === 0) return;
     var viewport = dashboardScroll.getBoundingClientRect(), rect = target.getBoundingClientRect();
     var scale = viewport.height / dashboardScroll.clientHeight;
@@ -224,8 +226,8 @@
     setClass($('quotes'), 'hide', st.zone === Z.TOP && st.top >= tabCount());
     list = $('cards').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.CARDS && st.card === i);
-    var dashboardItems = HomeDashboard.items(st.tab);
-    for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) setClass(dashboardNodes[key], 'focus', st.zone === Z.DASHBOARD && dashboardItems[st.dashboard] === key);
+    var dashboardSources = dashboardItems();
+    for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) setClass(dashboardNodes[key], 'focus', st.zone === Z.DASHBOARD && dashboardSources[st.dashboard] === key);
     focusMedia();
     focusVideos();
     focusNews();
@@ -352,7 +354,7 @@
 
   function focusedArtwork() {
     if (!dashboardOn || st.zone !== Z.DASHBOARD || saverOn || document.hidden) return null;
-    var source = HomeDashboard.items(st.tab)[st.dashboard], config = HomeProfile.config;
+    var source = dashboardItems()[st.dashboard], config = HomeProfile.config;
     if (source !== 'youtube' && source !== 'media') return null;
     var feed = source === 'youtube' ? config.youtubeFeed : config.mediaFeed, snapshot = source === 'youtube' ? videoSnapshot : mediaSnapshot;
     if (!feed || !snapshot || snapshot.feed !== feed || snapshot.rows !== feed.items || snapshot.count !== feed.items.length || snapshot.observedAt !== feed.observedAt || !HomeDashboard.app(config, source)) return null;
@@ -407,9 +409,9 @@
 
   function artworkHover(card, source, index) {
     card.onmousemove = function (event) {
-      if (!pointerMoved(event) || saverOn || sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf(source) < 0) return;
+      if (!pointerMoved(event) || saverOn || sheetOpen() || st.zone === Z.DRAWER || dashboardItems().indexOf(source) < 0) return;
       if (source === 'youtube') st.video = index; else st.media = index;
-      st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf(source); updateFocus();
+      st.zone = Z.DASHBOARD; st.dashboard = dashboardItems().indexOf(source); updateFocus();
     };
   }
 
@@ -422,7 +424,7 @@
     for (var i = 0; i < nodes.length; i++) {
       setClass(nodes[i], 'selected', !!selected && selected.source === 'media' && i === st.media);
       var image = nodes[i].querySelector('img');
-      if (image && !image.getAttribute('src') && i >= first && i <= first + width && HomeDashboard.items(st.tab).indexOf('media') >= 0) image.src = image.getAttribute('data-src');
+      if (image && !image.getAttribute('src') && i >= first && i <= first + width && dashboardItems().indexOf('media') >= 0) image.src = image.getAttribute('data-src');
     }
     mediaTrack.style.webkitTransform = mediaTrack.style.transform = 'translateX(' + (-first * step) + 'px)';
   }
@@ -464,8 +466,8 @@
       if (item.progress !== null) {var bar = el('div', 'media-progress', card); bar.style.width = item.progress + '%';}
       card.onclick = (function (index) {return function (event) {
         event.stopPropagation();
-        if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf('media') < 0) return;
-        st.media = index; st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf('media'); updateFocus(); activate();
+        if (sheetOpen() || st.zone === Z.DRAWER || dashboardItems().indexOf('media') < 0) return;
+        st.media = index; st.zone = Z.DASHBOARD; st.dashboard = dashboardItems().indexOf('media'); updateFocus(); activate();
       };})(i);
     }
     var at = MediaCards.observed(HomeProfile.config);
@@ -480,7 +482,7 @@
     for (var i = 0; i < videoTrack.children.length; i++) {
       var card = videoTrack.children[i], image = card.querySelector('img');
       setClass(card, 'selected', !!selected && selected.source === 'youtube' && i === st.video);
-      if (image && !image.getAttribute('src') && i >= first && i < first + 4 && HomeDashboard.items(st.tab).indexOf('youtube') >= 0) image.src = image.getAttribute('data-src');
+      if (image && !image.getAttribute('src') && i >= first && i < first + 4 && dashboardItems().indexOf('youtube') >= 0) image.src = image.getAttribute('data-src');
     }
     videoTrack.style.webkitTransform = videoTrack.style.transform = 'translateX(' + (-first * 372) + 'px)';
   }
@@ -517,8 +519,8 @@
       el('div', 'video-duration', artwork, item.live ? HomeProfile.labels.youtubeLive || 'Ao vivo' : item.liveCaptured ? HomeProfile.labels.youtubeLiveCaptured || 'Live na captura' : item.duration);
       card.onclick = (function (index) {return function (event) {
         event.stopPropagation();
-        if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf('youtube') < 0) return;
-        st.video = index; st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf('youtube'); updateFocus(); activate();
+        if (sheetOpen() || st.zone === Z.DRAWER || dashboardItems().indexOf('youtube') < 0) return;
+        st.video = index; st.zone = Z.DASHBOARD; st.dashboard = dashboardItems().indexOf('youtube'); updateFocus(); activate();
       };})(i);
     }
     el('div', 'video-stamp', panel, (HomeProfile.labels.synced || 'Synced') + ' ' + new Date(HomeProfile.config.youtubeFeed.observedAt).toLocaleString(I18N.locale()));
@@ -537,10 +539,10 @@
     if (!newsTrack) return;
     var visible=st.tab===1?4:3,step=st.tab===1?424:584;
     st.news=Math.max(0,Math.min(newsItems.length-1,st.news));
-    var first=Math.max(0,st.news-visible+1),show=HomeDashboard.items(st.tab).indexOf('news')>=0;
+    var first=Math.max(0,st.news-visible+1),show=dashboardItems().indexOf('news')>=0;
     for(var i=0;i<newsTrack.children.length;i++){
       var card=newsTrack.children[i],image=card.querySelector('img');
-      setClass(card,'selected',show&&st.zone===Z.DASHBOARD&&HomeDashboard.items(st.tab)[st.dashboard]==='news'&&i===st.news);
+      setClass(card,'selected',show&&st.zone===Z.DASHBOARD&&dashboardItems()[st.dashboard]==='news'&&i===st.news);
       if(image&&!image.getAttribute('src')&&show&&i>=first&&i<=first+visible)image.src=image.getAttribute('data-src');
     }
     newsTrack.style.webkitTransform=newsTrack.style.transform='translateX('+(-first*step)+'px)';
@@ -551,7 +553,7 @@
   }
 
   function closeNewsReport() {
-    dismissNewsReport();st.zone=Z.DASHBOARD;st.dashboard=Math.max(0,HomeDashboard.items(st.tab).indexOf('news'));updateFocus();
+    dismissNewsReport();st.zone=Z.DASHBOARD;st.dashboard=Math.max(0,dashboardItems().indexOf('news'));updateFocus();
   }
 
   function openNewsReport() {
@@ -587,7 +589,7 @@
     newsTrack=null;newsItems=NewsFeed.items(HomeProfile.config);st.news=retainedArtworkIndex(newsItems,previous,st.news);
     if(newsReportState){
       var current=false;for(var n=0;n<newsItems.length;n++)if(newsItems[n].id===newsReportState.id&&newsItems[n].analyzedAt===newsReportState.analyzedAt)current=true;
-      if(!current){dismissNewsReport();if(st.zone===Z.REPORT){st.zone=Z.DASHBOARD;st.dashboard=Math.max(0,HomeDashboard.items(st.tab).indexOf('news'));}}
+      if(!current){dismissNewsReport();if(st.zone===Z.REPORT){st.zone=Z.DASHBOARD;st.dashboard=Math.max(0,dashboardItems().indexOf('news'));}}
     }
     setClass(panel,'has-news',newsItems.length>0);
     if(!newsItems.length){panel.querySelector('.dashboard-subtitle').textContent=HomeProfile.config.newsFeed?labels.newsRefresh||'Relatórios aguardando atualização':labels.newsPending||'News not connected';return;}
@@ -597,8 +599,8 @@
       setClass(card,'no-image',!item.image);card.setAttribute('aria-label',item.title+' · '+item.source);
       if(item.image){var image=el('img','news-image',card);image.alt='';image.setAttribute('data-src',item.image);image.onerror=function(){setClass(this.parentNode,'no-image',true);setClass(this,'failed',true);};}
       el('div','news-headline',card,item.title);el('div','news-meta',card,item.source+' · '+newsPublication(item));
-      card.onmousemove=(function(index){return function(event){if(!pointerMoved(event)||saverOn||sheetOpen()||st.zone===Z.DRAWER||HomeDashboard.items(st.tab).indexOf('news')<0)return;st.news=index;st.zone=Z.DASHBOARD;st.dashboard=HomeDashboard.items(st.tab).indexOf('news');updateFocus();};})(i);
-      card.onclick=(function(index){return function(event){event.stopPropagation();if(saverOn||sheetOpen()||st.zone===Z.DRAWER||HomeDashboard.items(st.tab).indexOf('news')<0)return;st.news=index;st.zone=Z.DASHBOARD;st.dashboard=HomeDashboard.items(st.tab).indexOf('news');activate();};})(i);
+      card.onmousemove=(function(index){return function(event){if(!pointerMoved(event)||saverOn||sheetOpen()||st.zone===Z.DRAWER||dashboardItems().indexOf('news')<0)return;st.news=index;st.zone=Z.DASHBOARD;st.dashboard=dashboardItems().indexOf('news');updateFocus();};})(i);
+      card.onclick=(function(index){return function(event){event.stopPropagation();if(saverOn||sheetOpen()||st.zone===Z.DRAWER||dashboardItems().indexOf('news')<0)return;st.news=index;st.zone=Z.DASHBOARD;st.dashboard=dashboardItems().indexOf('news');activate();};})(i);
     }
   }
 
@@ -616,12 +618,12 @@
         el('div', 'dashboard-title', panel, source === 'youtube' ? labels.youtubeTab || 'YouTube' : source === 'media' ? 'Nuvio' : labels.newsTab || 'News');
         el('div', 'dashboard-subtitle', panel, source === 'youtube' ? labels.youtubePending || 'Subscriptions not connected' : source === 'media' ? labels.mediaPending || 'Open your library in Nuvio' : labels.newsPending || 'News not connected');
         panel.onclick = (function (key) {return function () {
-          if (sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf(key) < 0) return;
-          st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf(key); activate();
+          if (sheetOpen() || st.zone === Z.DRAWER || dashboardItems().indexOf(key) < 0) return;
+          st.zone = Z.DASHBOARD; st.dashboard = dashboardItems().indexOf(key); activate();
         };})(source);
         panel.onmousemove = (function (key) {return function (event) {
-          if (!pointerMoved(event) || saverOn || sheetOpen() || st.zone === Z.DRAWER || HomeDashboard.items(st.tab).indexOf(key) < 0) return;
-          st.zone = Z.DASHBOARD; st.dashboard = HomeDashboard.items(st.tab).indexOf(key); updateFocus();
+          if (!pointerMoved(event) || saverOn || sheetOpen() || st.zone === Z.DRAWER || dashboardItems().indexOf(key) < 0) return;
+          st.zone = Z.DASHBOARD; st.dashboard = dashboardItems().indexOf(key); updateFocus();
         };})(source);
       }
     }
@@ -629,8 +631,10 @@
     renderVideos();
     renderNews();
     setClass(body, 'dashboard-home', true);
+    setClass(body, 'cinema-layout', Prefs.dashboardLayout() === 'cinema');
+    setClass(body, 'info-layout', st.tab === 3);
     holder.setAttribute('data-view', HomeDashboard.tabs[st.tab]);
-    var visible = HomeDashboard.items(st.tab);
+    var visible = dashboardItems();
     for (var key in dashboardNodes) if (dashboardNodes.hasOwnProperty(key)) dashboardNodes[key].style.display = visible.indexOf(key) >= 0 ? '' : 'none';
     st.dashboard = Math.max(0, Math.min(st.dashboard, visible.length - 1));
     cards = []; $('cards').innerHTML = ''; backdrop(''); updateFocus();
@@ -949,7 +953,7 @@
   var widgetKinds = dashboardOn ? ['arch', 'weather', 'calendar', 'webosbrew'] : ['arch', 'webosbrew'];
   var widgetsOn = !!HomeProfile.config.homeWidgets, widgetsPaused = false, widgetNodes = {}, widgetControl = null;
   function syncHomeWidgets() {
-    if (widgetControl) widgetControl.sync(!document.hidden && !widgetsPaused && !sheetOpen() && st.zone !== Z.DRAWER);
+    if (widgetControl) widgetControl.sync(widgetsVisible() && !document.hidden && !widgetsPaused && !sheetOpen() && st.zone !== Z.DRAWER);
   }
   function initHomeWidgets() {
     if (!widgetsOn) return;
@@ -1281,7 +1285,7 @@
         else openSettings();
         return;
       case Z.DASHBOARD:
-        var source = HomeDashboard.items(st.tab)[st.dashboard], target = HomeDashboard.app(HomeProfile.config, source);
+        var source = dashboardItems()[st.dashboard], target = HomeDashboard.app(HomeProfile.config, source);
         var focused = focusedArtwork();
         if (((source === 'youtube' && videoItems.length) || (source === 'media' && mediaItems.length)) && !focused) {renderDashboard();return;}
         var videoTarget = source === 'youtube' && videoItems.length ? YouTubeFeed.target(HomeProfile.config, st.video, focused.item.id) : null;
@@ -1295,6 +1299,7 @@
         move(0,0);
         return;
       case Z.WIDGETS:
+        if (!widgetsVisible()) return;
         var kind = widgetKinds[st.widget];
         if (kind === 'arch') openHomelab();
         else if (kind === 'webosbrew') launcher('org.webosbrew.hbchannel', 'webOSbrew')();
@@ -1339,14 +1344,15 @@
         if (dx) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dx));
         else if (dy > 0) { openDrawer(); return; }
         else if (dy < 0) {
-          if (widgetsOn) { st.zone = Z.WIDGETS; st.widget = nearest($('home-widgets').children, centerX(tiles[st.shelf])); }
+          if (widgetsVisible()) { st.zone = Z.WIDGETS; st.widget = nearest($('home-widgets').children, centerX(tiles[st.shelf])); }
+          else if (dashboardOn && dashboardItems().length) {st.zone = Z.DASHBOARD;st.dashboard = dashboardItems().length - 1;}
           else if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(tiles[st.shelf])); }
           else { st.zone = Z.TOP; st.top = st.tab; }
         }
         break;
       case Z.WIDGETS:
         if (dx) st.widget = Math.max(0, Math.min(widgetKinds.length - 1, st.widget + dx));
-        else if (dy < 0) {st.zone = dashboardOn && HomeDashboard.items(st.tab).length ? Z.DASHBOARD : cards.length ? Z.CARDS : Z.TOP; st.dashboard = Math.max(0, HomeDashboard.items(st.tab).length - 1); st.top = st.tab;}
+        else if (dy < 0) {st.zone = dashboardOn && dashboardItems().length ? Z.DASHBOARD : cards.length ? Z.CARDS : Z.TOP; st.dashboard = Math.max(0, dashboardItems().length - 1); st.top = st.tab;}
         else if (dy > 0) {st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX($('home-widgets').children[st.widget]));}
         break;
       case Z.REPORT:
@@ -1356,23 +1362,23 @@
         if(reportBody&&dy)reportBody.scrollTop+=dy*140;
         break;
       case Z.DASHBOARD:
-        if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'youtube' && videoItems.length && (dx < 0 || st.video < videoItems.length - 1)) {
+        if (dx && dashboardItems()[st.dashboard] === 'youtube' && videoItems.length && (dx < 0 || st.video < videoItems.length - 1)) {
           st.video = Math.max(0, Math.min(videoItems.length - 1, st.video + dx)); updateFocus(); return;
         }
-        if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'news' && newsItems.length) {st.news = Math.max(0, Math.min(newsItems.length - 1, st.news + dx));updateFocus();return;}
-        if (dx && HomeDashboard.items(st.tab)[st.dashboard] === 'media' && mediaItems.length && (dx > 0 || st.media > 0)) {
+        if (dx && dashboardItems()[st.dashboard] === 'news' && newsItems.length) {st.news = Math.max(0, Math.min(newsItems.length - 1, st.news + dx));updateFocus();return;}
+        if (dx && dashboardItems()[st.dashboard] === 'media' && mediaItems.length && (dx > 0 || st.media > 0)) {
           st.media = Math.max(0, Math.min(mediaItems.length - 1, st.media + dx)); updateFocus(); return;
         }
-        var next = HomeDashboard.next(st.tab, st.dashboard, dx, dy);
+        var next = HomeDashboard.next(st.tab, st.dashboard, dx, dy, Prefs.dashboardLayout());
         st.zone = next.zone;
         if (next.index !== undefined) st.dashboard = next.index;
         if (st.zone === Z.TOP) st.top = st.tab;
-        if (st.zone === Z.WIDGETS && !widgetsOn) st.zone = Z.SHELF;
+        if (st.zone === Z.WIDGETS && !widgetsVisible()) st.zone = Z.SHELF;
         break;
       case Z.CARDS:
         if (dx) st.card = Math.max(0, Math.min(cards.length - 1, st.card + dx));
         else if (dy < 0) { st.zone = Z.TOP; st.top = st.tab; }
-        else if (widgetsOn) st.zone = Z.WIDGETS;
+        else if (widgetsVisible()) st.zone = Z.WIDGETS;
         else if (shelf.length) { st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX(cardNodes[st.card])); }
         break;
       case Z.TOP:
@@ -1380,9 +1386,9 @@
           st.top = Math.max(0, Math.min(tabCount() + topButtonCount() - 1, st.top + dx));
           if (st.top < tabCount()) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
-          if (dashboardOn && HomeDashboard.items(st.tab).length) {st.zone = Z.DASHBOARD; st.dashboard = 0;}
+          if (dashboardOn && dashboardItems().length) {st.zone = Z.DASHBOARD; st.dashboard = 0;}
           else if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < tabCount() ? 0 : cards.length - 1); }
-          else st.zone = widgetsOn ? Z.WIDGETS : Z.SHELF;
+          else st.zone = widgetsVisible() ? Z.WIDGETS : Z.SHELF;
         }
         break;
       case Z.DRAWER:
@@ -1426,6 +1432,7 @@
   /** The pointer focuses what it's over (the Magic Remote, or a mouse when previewing). */
   function hover(node, zone, index) {
     node.onmouseover = function () {
+      if (zone === Z.WIDGETS && !widgetsVisible()) return;
       if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.LANG))) return;
       if (zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
       if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
@@ -1442,7 +1449,7 @@
       else if (zone === Z.LANG) st.lang = index;
       updateFocus();
     };
-    node.onclick = function () { node.onmouseover(); activate(); };
+    node.onclick = function () { if (zone === Z.WIDGETS && !widgetsVisible()) return; node.onmouseover(); activate(); };
   }
 
   // MARK: - Toast
