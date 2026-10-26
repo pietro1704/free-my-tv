@@ -152,6 +152,33 @@
   var Z = {REPORT:'report', DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
   var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
+  var dashboardScroll = null, dashboardStack = null, dashboardScrollTab = -1;
+
+  function initDashboardScroll() {
+    if (!dashboardOn) return;
+    dashboardScroll = el('div', '', $('top')); dashboardScroll.id = 'dashboard-scroll';
+    dashboardStack = el('div', '', dashboardScroll); dashboardStack.id = 'dashboard-stack';
+    dashboardStack.appendChild($('dashboard'));
+    dashboardStack.appendChild($('home-widgets'));
+  }
+
+  function scrollDashboardFocus() {
+    if (!dashboardScroll) return;
+    var content = $('dashboard'), widgets = $('home-widgets');
+    var bottom = content.offsetTop + content.offsetHeight;
+    if (widgetsOn) bottom = Math.max(bottom, widgets.offsetTop + widgets.offsetHeight);
+    var height = (bottom + 12) + 'px';
+    if (dashboardStack.style.height !== height) dashboardStack.style.height = height;
+    if (dashboardScrollTab !== st.tab || st.zone === Z.TOP) dashboardScroll.scrollTop = 0;
+    dashboardScrollTab = st.tab;
+    var target = st.zone === Z.WIDGETS ? widgets.children[st.widget] : st.zone === Z.DASHBOARD ? dashboardNodes[HomeDashboard.items(st.tab)[st.dashboard]] : null;
+    if (!target || target.offsetHeight === 0) return;
+    var viewport = dashboardScroll.getBoundingClientRect(), rect = target.getBoundingClientRect();
+    var scale = viewport.height / dashboardScroll.clientHeight;
+    if (!isFinite(scale) || scale <= 0) return;
+    if (rect.bottom > viewport.bottom) dashboardScroll.scrollTop += Math.ceil((rect.bottom - viewport.bottom) / scale) + 8;
+    else if (rect.top < viewport.top) dashboardScroll.scrollTop -= Math.ceil((viewport.top - rect.top) / scale) + 8;
+  }
 
   function sheetOpen() { return st.zone === Z.REPORT || st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
 
@@ -188,6 +215,7 @@
     focusRows($('langpick'), st.lang, st.zone === Z.LANG);
     if (langHint) langHint.textContent = (st.lang + 1) + ' / ' + languageChoices().length + '  ·  ' + tr('OK picks, Back cancels.');
     setClass(body, 'drawer-open', st.zone === Z.DRAWER);
+    scrollDashboardFocus();
     syncHomeWidgets();
   }
 
@@ -411,7 +439,7 @@
       setClass(card, 'selected', !!selected && selected.source === 'youtube' && i === st.video);
       if (image && !image.getAttribute('src') && i >= first && i < first + 4 && HomeDashboard.items(st.tab).indexOf('youtube') >= 0) image.src = image.getAttribute('data-src');
     }
-    videoTrack.style.webkitTransform = videoTrack.style.transform = 'translateX(' + (-first * 334) + 'px)';
+    videoTrack.style.webkitTransform = videoTrack.style.transform = 'translateX(' + (-first * 372) + 'px)';
   }
 
   function renderVideos() {
@@ -435,7 +463,7 @@
     for (var i = 0; i < videoItems.length; i++) {
       var item = videoItems[i], card = el('div', 'video-card', videoTrack);
       artworkHover(card, 'youtube', i);
-      card.style.left = (i * 334) + 'px';
+      card.style.left = (i * 372) + 'px';
       var artwork = el('div', 'video-art', card);
       if (item.image) {
         var image = el('img', '', artwork); image.alt = ''; image.setAttribute('data-src', item.image);
@@ -1560,6 +1588,7 @@
   });
 
   I18N.set(Prefs.language());
+  initDashboardScroll();
   initHomeWidgets();
   fit();
   renderTop();
