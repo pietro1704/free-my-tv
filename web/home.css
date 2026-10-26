@@ -804,3 +804,11 @@ body.dashboard-home.reduced-motion .round.focus { -webkit-transform: none; trans
   body.dashboard-home .tile.focus, body.dashboard-home .tab.focus,
   body.dashboard-home .round.focus, body.dashboard-home .key.focus { -webkit-transform: none; transform: none; }
 }
+
+.dashboard-home.cinematic-dashboard #sky canvas { -webkit-transition: opacity 0.12s; transition: opacity 0.12s; }
+.dashboard-home.cinematic-dashboard.reduced-motion #sky canvas { -webkit-transition: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { .dashboard-home.cinematic-dashboard #sky canvas { -webkit-transition: none; transition: none; } }
+
+/* Only visible artwork and its immediate neighbor reserve compositor resources. */
+.dashboard-home .focus-ready { will-change: transform; }
+.dashboard-home .hero-art { will-change: transform; -webkit-transform: translateZ(0); transform: translateZ(0); }
