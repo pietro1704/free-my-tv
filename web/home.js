@@ -1572,16 +1572,20 @@
     });
   }
 
-  /** Back to the home screen (the app was opened again): the shelf, everything closed, the first tab. */
+  /** A running dashboard resumes its navigation; the legacy home reopens at the first shelf app. */
   function reset() {
+    var zone = dashboardOn && !sheetOpen() && st.zone !== Z.DRAWER ? st.zone : null;
     widgetsPaused = false;
     idleAt = Date.now();
     nextSaverAttempt = 0;
     hideSaver();
     closeSheets();
-    st.zone = Z.SHELF;
-    st.shelf = 0;
-    if (st.tab !== 0) { st.tab = 0; renderCards(); }
+    if (zone) st.zone = zone;
+    if (!dashboardOn) {
+      st.zone = Z.SHELF;
+      st.shelf = 0;
+      if (st.tab !== 0) { st.tab = 0; renderCards(); }
+    }
     updateFocus();
   }
 
@@ -1596,7 +1600,7 @@
     // LG: with handlesRelaunch the app has to come to the front itself, or opening it again while it runs shows nothing.
     if (window.PalmSystem && window.PalmSystem.activate) window.PalmSystem.activate();
     reset();
-    loadApps(function () { renderShelf(); renderDrawer(); Data.refresh(); });
+    loadApps(function () { renderShelf(); renderDrawer(); renderCards(); updateFocus(); Data.refresh(); });
   }
 
   window.addEventListener('resize', fit);
@@ -1607,7 +1611,8 @@
     if (document.hidden) {
       releaseArtworkPress();
       hideSaver();
-      if (diagnosticsOn || homelabOn || calendarOn || st.zone===Z.REPORT) closeSheets();
+      if (calendarOn || st.zone === Z.REPORT) back();
+      else if (diagnosticsOn || homelabOn) closeSheets();
       stopDiagnostics();
       syncHomeWidgets();
       return;
@@ -1616,7 +1621,7 @@
     syncHomeWidgets();
     idleAt = Date.now();
     nextSaverAttempt = 0;
-    loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
+    loadApps(function () { renderShelf(); renderDrawer(); renderCards(); updateFocus(); Data.refresh(); });
   });
 
   I18N.set(Prefs.language());
