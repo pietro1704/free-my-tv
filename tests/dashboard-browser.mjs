@@ -132,9 +132,11 @@ try {
   const pointerLaunchBefore=await evaluate('window.__launches.length');
   const pointerVideoId=await evaluate('YouTubeFeed.items(HomeProfile.config)[1].id');
   await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,clickCount:1,...pointerCard});
+  assert.equal(await evaluate("!!document.querySelector('.video-card.pressed')"),true,'Pointer down must visibly press the selected artwork');
   await evaluate('Data.settingsChanged()');
   await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,clickCount:1,...pointerCard});
   await wait(40);
+  assert.equal(await evaluate("document.querySelectorAll('.pressed').length"),0,'Release must clear visual press state');
   assert.deepEqual(await evaluate('({apps:window.__launches.slice('+pointerLaunchBefore+'),params:window.__launchParams[window.__launchParams.length-1]})'),{apps:['com.cobalt.youtube.adfree'],params:{contentTarget:'v='+pointerVideoId}},'A data refresh between pointer press and release must not swallow the chosen video click');
   const pointerTitle=await evaluate('CONFIG.homeProfile.youtubeFeed.items.filter(function(x){return x.id==='+JSON.stringify(pointerVideoId)+'})[0].title');
   for(const cancelledBy of ['outside','blur']) {
@@ -146,6 +148,7 @@ try {
     if(cancelledBy==='blur') await evaluate("window.dispatchEvent(new Event('blur'))");
     await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,clickCount:1,x:10,y:10});
     await wait(40);
+    assert.equal(await evaluate("document.querySelectorAll('.pressed').length"),0,'Cancellation must release the visual press state');
     assert.deepEqual(await evaluate('({launches:window.__launches.length-'+before+',updated:document.querySelectorAll(".video-name")[1].textContent})'),{launches:0,updated:'Updated after '+cancelledBy},'Cancelled pointer gestures must not launch and must release deferred updates');
   }
   await evaluate('CONFIG.homeProfile.youtubeFeed.items.filter(function(x){return x.id==='+JSON.stringify(pointerVideoId)+'})[0].title='+JSON.stringify(pointerTitle)+';Data.settingsChanged()');
@@ -434,6 +437,11 @@ try {
   await returnDashboard('webOSRelaunch');
   assert.deepEqual(await evaluate("({zone:FreeMyTV.state.zone,widget:FreeMyTV.state.widget,closed:document.getElementById('settings').className.indexOf('open')<0})"),{zone:'widgets',widget:2,closed:true},'Backgrounding the agenda must return to its widget without reopening stale events');
   await evaluate("FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.move(0,0)");
+
+  await call('Input.dispatchKeyEvent',{type:'keyDown',windowsVirtualKeyCode:13,key:'Enter',code:'Enter'});
+  assert.equal(await evaluate("!!document.querySelector('.video-card.pressed')"),true,'Remote OK must provide the same pressed feedback');
+  await call('Input.dispatchKeyEvent',{type:'keyUp',windowsVirtualKeyCode:13,key:'Enter',code:'Enter'});
+  assert.equal(await evaluate("document.querySelectorAll('.pressed').length"),0,'Remote release must clear feedback');
 
   const hiddenSaver=await evaluate(`(function(){var before=window.__launches.length;
     try{Object.defineProperty(document,'hidden',{configurable:true,value:true});FreeMyTV.showSaver();return window.__launches.length-before}

@@ -154,9 +154,11 @@
   var cards = [];
   var featurePreview = HomeHero.create($('feature-preview'));
   var dashboardScroll = null, dashboardStack = null, dashboardScrollTab = -1;
+  var pressedArtwork = null;
   var artworkPress = false, artworkRefreshPending = false, artworkPressTimer = 0;
 
   function releaseArtworkPress() {
+    setClass(pressedArtwork, 'pressed', false); pressedArtwork = null;
     if (!artworkPress) return;
     artworkPress = false;
     clearTimeout(artworkPressTimer);
@@ -172,6 +174,7 @@
     var node = event.target;
     while (node && node !== $('dashboard')) {
       if (hasClass(node, 'video-card') || hasClass(node, 'media-card') || hasClass(node, 'news-card')) {
+        pressedArtwork = node; setClass(node, 'pressed', true);
         artworkPress = true;
         clearTimeout(artworkPressTimer);
         artworkPressTimer = setTimeout(releaseArtworkPress, 5000);
@@ -1541,11 +1544,15 @@
     else if (k === TV.keys.right) move(1, 0);
     else if (k === TV.keys.up) move(0, -1);
     else if (k === TV.keys.down) move(0, 1);
-    else if (k === TV.keys.ok) activate();
+    else if (k === TV.keys.ok) {
+      if (dashboardOn && st.zone === Z.DASHBOARD) {pressedArtwork = document.querySelector('.video-card.selected, .media-card.selected, .news-card.selected');setClass(pressedArtwork, 'pressed', true);}
+      activate();
+    }
     else if (k === TV.keys.back || k === 27 || k === 8) back();
     else return;
     e.preventDefault();
   });
+  document.addEventListener('keyup', function (event) {if (event.keyCode === TV.keys.ok) releaseArtworkPress();});
   document.addEventListener('mousemove', function (event) { pointerX = event.clientX; pointerY = event.clientY; poke(); });
   document.addEventListener('mousedown', beginArtworkPress, true);
   document.addEventListener('mouseup', releaseArtworkPress, true);

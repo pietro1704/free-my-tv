@@ -740,3 +740,8 @@ body.dashboard-home.night, .dashboard-home.night #sky { background: #000; }
 .hero-title { position: absolute; left: 32px; top: 26px; width: 1050px; max-height: 96px; overflow: hidden; font-size: 38px; line-height: 46px; font-weight: 600; color: #eee; }
 .hero-meta { position: absolute; left: 32px; bottom: 24px; right: 480px; font-size: 23px; line-height: 28px; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .preview-layout #dashboard-scroll { top: 354px; height: 472px; }
+
+/* Focus and press are distinct; enlargement stays inside the artwork gutters. */
+.dashboard-home .media-card, .dashboard-home .video-card { border-radius: 12px; border-color: #29292c; }
+.dashboard-home .media-card.selected, .dashboard-home .video-card.selected { border-color: #eee; box-shadow: 0 0 0 1px #aaa, 0 8px 18px rgba(0,0,0,0.35); -webkit-transform: scale(1.04); transform: scale(1.04); }
+.dashboard-home .video-card.pressed, .dashboard-home .media-card.pressed, .dashboard-home .news-card.pressed { -webkit-transform: scale(0.98); transform: scale(0.98); opacity: 0.8; }
