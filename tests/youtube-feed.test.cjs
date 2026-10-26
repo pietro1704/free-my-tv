@@ -18,8 +18,20 @@ test('Cobalt target uses its TV route and binds the launch to the selected ident
  c.youtubeFeed.accountConfirmed=false;assert.equal(a.target(c,1,'VIDEO000001'),null);
 });
 test('other configured YouTube apps retain their URL launch contract',()=>{
- const a=api(),c=config([row('VIDEO000001')]);c.youtubeApp='youtube.leanback.v4';c.youtubeFeed.appId=c.youtubeApp;c.items=[{id:c.youtubeApp}];
- assert.deepEqual(JSON.parse(JSON.stringify(a.target(c,0,'VIDEO000001'))),{id:'youtube.leanback.v4',params:{contentTarget:'https://www.youtube.com/watch?v=VIDEO000001'}});
+ const a=api(),c=config([row('VIDEO000001')]);c.youtubeApp='youtube.other';c.youtubeFeed.appId=c.youtubeApp;c.items=[{id:c.youtubeApp}];
+ assert.deepEqual(JSON.parse(JSON.stringify(a.target(c,0,'VIDEO000001'))),{id:'youtube.other',params:{contentTarget:'https://www.youtube.com/watch?v=VIDEO000001'}});
+});
+test('Pietro webOS YouTube opens the TV surface and retains account and selected-video guards',()=>{
+ const a=api(),c=config([row('VIDEO000001'),row('VIDEO000002',{rank:1})]);
+ c.youtubeApp='youtube.leanback.v4';c.items=[{id:c.youtubeApp}];
+ assert.equal(a.target(c,0,'VIDEO000001'),null,'Changing apps cannot implicitly confirm the old account snapshot');
+ c.youtubeFeed.appId=c.youtubeApp;
+ assert.deepEqual(JSON.parse(JSON.stringify(a.target(c,0,'VIDEO000001'))),{id:c.youtubeApp,params:{contentTarget:'https://www.youtube.com/tv?v=VIDEO000001'}});
+ assert.equal(a.target(c,0,'VIDEO000002'),null);
+ c.youtubeFeed.items[0].rank=2;
+ assert.equal(a.target(c,0,'VIDEO000001'),null);
+ assert.equal(a.target(c,1,'VIDEO000001').params.contentTarget,'https://www.youtube.com/tv?v=VIDEO000001');
+ c.youtubeFeed.accountConfirmed=false;assert.equal(a.target(c,1,'VIDEO000001'),null);
 });
 test('watched, Shorts, upcoming and duplicate IDs are excluded; feed order and current lives remain',()=>{
  const a=api(),c=config([row('VIDEO000001',{rank:3}),row('VIDEO000002',{rank:1,live:true}),row('VIDEO000003',{watched:true}),row('VIDEO000004',{short:true}),row('VIDEO000005',{upcoming:true}),row('VIDEO000002')]);const items=a.items(c);assert.deepEqual(Array.from(items,x=>x.id),['VIDEO000002','VIDEO000001']);assert.equal(items[0].live,true);

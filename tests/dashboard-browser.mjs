@@ -342,6 +342,17 @@ try {
   assert.deepEqual(videos,{selected:1,id:'com.cobalt.youtube.adfree',params:{contentTarget:'v=VIDEO000001'}});
   const failedVideo=await evaluate(`(async function(){var before=window.__launches.length;document.getElementById('toast').className='';window.__failLaunch=true;try{document.querySelector('.video-card').click();await new Promise(function(resolve){setTimeout(resolve,30)});return {apps:window.__launches.slice(before),identity:FreeMyTV.state.video===0,feedback:document.getElementById('toast').className.indexOf('on')>=0}}finally{window.__failLaunch=false}})()`);
   assert.deepEqual(failedVideo,{apps:['com.cobalt.youtube.adfree'],identity:true,feedback:true},'A failed video launch must retain the card and show feedback without falling back to another YouTube app');
+  const currentYouTube=await evaluate(`(async function(){var c=CONFIG.homeProfile,app=c.youtubeApp,feedApp=c.youtubeFeed.appId,item=c.items[0].id;try{
+    c.youtubeApp=c.youtubeFeed.appId=c.items[0].id='youtube.leanback.v4';Data.settingsChanged();
+    var before=window.__launches.length;document.querySelector('.video-card').click();
+    var result={apps:window.__launches.slice(before),params:window.__launchParams[window.__launchParams.length-1]};
+    document.getElementById('toast').className='';window.__failLaunch=true;document.querySelector('.video-card').click();
+    await new Promise(function(resolve){setTimeout(resolve,30)});
+    result.failure=document.getElementById('toast').className.indexOf('on')>=0;
+    result.fallback=window.__launches.slice(before).some(function(id){return id!=='youtube.leanback.v4'});
+    return result;
+  }finally{window.__failLaunch=false;c.youtubeApp=app;c.youtubeFeed.appId=feedApp;c.items[0].id=item;Data.settingsChanged()}})()`);
+  assert.deepEqual(currentYouTube,{apps:['youtube.leanback.v4'],params:{contentTarget:'https://www.youtube.com/tv?v=VIDEO000001'},failure:true,fallback:false},'The current webOS YouTube must receive the selected video on its TV surface and report failure without opening Cobalt');
   assert.equal(await evaluate("document.querySelectorAll('.video-card img[src]').length"),3);
   assert.equal(await evaluate("document.querySelector('.video-card img').naturalWidth>0"),true,'Subscription artwork loads offline');
   const videoCarousel=await evaluate(`(async function(){var feed=CONFIG.homeProfile.youtubeFeed,original=feed.items.slice();try{
