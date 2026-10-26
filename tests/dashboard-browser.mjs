@@ -87,6 +87,15 @@ try {
   assert.equal(await evaluate("document.querySelectorAll('#buttons button').length"),1,'Dashboard header must have one controls entry');
   const header=await evaluate(`(function(){var title=document.getElementById('title').getBoundingClientRect(),tabs=document.getElementById('tabs').getBoundingClientRect(),button=document.querySelector('#buttons button').getBoundingClientRect(),content=document.getElementById('dashboard').getBoundingClientRect();return {compact:title.height<=40,sameRow:Math.abs(title.top-tabs.top)<25,separate:title.right<tabs.left&&tabs.right<button.left,above:Math.max(title.bottom,tabs.bottom,button.bottom)<content.top}})()`);
   assert.deepEqual(header,{compact:true,sameRow:true,separate:true,above:true});
+  const oledAuto=await evaluate(`(function(){var previous=Data.isNight;try{Data.isNight=function(){return false};Prefs.set('theme','auto');Data.settingsChanged();return {dark:document.body.className.indexOf('night')>=0,black:getComputedStyle(document.getElementById('sky')).backgroundColor,layers:Array.prototype.every.call(document.querySelectorAll('#sky > *'),function(x){return getComputedStyle(x).display==='none'}),preference:Prefs.theme()}}finally{Data.isNight=previous}})()`);
+  assert.deepEqual(oledAuto,{dark:true,black:'rgb(0, 0, 0)',layers:true,preference:'auto'},'Automatic dashboard theme must use a true black OLED background even during daylight without rewriting preferences');
+  const explicitLight=await evaluate(`(function(){Prefs.set('theme','light');Data.settingsChanged();var out={dark:document.body.className.indexOf('night')>=0,preference:Prefs.theme(),visible:getComputedStyle(document.querySelector('#sky .day')).display!=='none'};Prefs.set('theme','auto');Data.settingsChanged();return out})()`);
+  assert.deepEqual(explicitLight,{dark:false,preference:'light',visible:true},'An explicitly selected light theme must remain available');
+  await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+  assert.equal(await evaluate("Array.prototype.every.call(document.querySelectorAll('#home,#drawer,#top,.tab,.round,.tile,.video-card,.media-card,.news-card,.box .rows'),function(x){return getComputedStyle(x).transitionDuration==='0s'})"),true,'Reduced motion must disable dashboard transitions while retaining static focus cues');
+  await call('Emulation.setEmulatedMedia',{features:[]});
+  const oledFocus=await evaluate(`(function(){FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(-1,0);var style=getComputedStyle(document.querySelector('.tab.focus'));return {background:style.backgroundColor,color:style.color,outline:style.boxShadow!=='none'}})()`);
+  assert.deepEqual(oledFocus,{background:'rgb(36, 36, 38)',color:'rgb(221, 221, 221)',outline:true},'OLED focus must stay readable without a bright white tile');
   const topNavigation=await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=3;FreeMyTV.move(99,0);FreeMyTV.state.top");
   assert.equal(topNavigation,4,'Remote must stop at the one visible controls button');
   await evaluate("document.querySelector('#buttons button').click()");

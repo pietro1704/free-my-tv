@@ -1416,7 +1416,7 @@
   // MARK: - Night, clock, screensaver
 
   function checkNight() {
-    setClass(body, 'night', Data.isNight(Date.now()));
+    setClass(body, 'night', (dashboardOn && Prefs.theme() === 'auto') || Data.isNight(Date.now()));
   }
 
   var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverGeneration = 0;
