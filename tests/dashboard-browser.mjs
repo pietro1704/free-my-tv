@@ -254,8 +254,12 @@ try {
     await wait(50);
   }
   assert.equal(await evaluate("document.querySelector('#feature-preview .hero-title').textContent==='YouTube fixture 0'&&document.getElementById('feature-preview').getBoundingClientRect().bottom<document.getElementById('dashboard-scroll').getBoundingClientRect().top"),true,'Contextual artwork must retain selected identity and reserve space above content');
-  const focusedVideo=await evaluate(`(function(){var card=document.querySelector('.video-card.selected'),viewport=document.querySelector('.video-viewport').getBoundingClientRect(),r=card.getBoundingClientRect(),details=document.getElementById('focus-details');return {grown:r.width>card.offsetWidth,inside:r.left>=viewport.left&&r.right<=viewport.right&&r.top>=viewport.top&&r.bottom<=viewport.bottom,details:!!details&&getComputedStyle(details).display!=='none'&&details.textContent.indexOf('YouTube fixture 0')>=0,dockHidden:getComputedStyle(document.getElementById('tiles')).visibility==='hidden'}})()`);
-  assert.deepEqual(focusedVideo,{grown:true,inside:true,details:true,dockHidden:true},'Focused artwork must grow without clipping and show its complete details in place of the dock');
+  const focusedVideo=await evaluate(`(function(){var card=document.querySelector('.video-card.selected'),viewport=document.querySelector('.video-viewport').getBoundingClientRect(),r=card.getBoundingClientRect(),details=document.getElementById('focus-details');return {grown:r.width>card.offsetWidth,inside:r.left>=viewport.left&&r.right<=viewport.right&&r.top>=viewport.top&&r.bottom<=viewport.bottom,details:!!details&&getComputedStyle(details).display!=='none'&&details.textContent.indexOf('YouTube fixture 0')>=0,dockVisible:getComputedStyle(document.getElementById('tiles')).visibility==='visible',separate:details.getBoundingClientRect().bottom<document.getElementById('platter').getBoundingClientRect().top}})()`);
+  assert.deepEqual(focusedVideo,{grown:true,inside:true,details:true,dockVisible:true,separate:true},'Focused artwork must grow without clipping and show details while keeping the dock visible and separate');
+  const dockPosition=await evaluate("document.getElementById('platter').getBoundingClientRect().top");
+  await evaluate('FreeMyTV.back()');
+  assert.deepEqual(await evaluate("({zone:FreeMyTV.state.zone,top:document.getElementById('platter').getBoundingClientRect().top})"),{zone:'shelf',top:dockPosition},'One Back reaches the dock without moving it');
+  await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=0;FreeMyTV.move(0,1)");
   const focusStampGap=await evaluate("document.querySelector('.video-stamp').getBoundingClientRect().top-document.querySelector('.video-card.selected').getBoundingClientRect().bottom");
   assert.ok(focusStampGap>=1,'Focus outline must not cover the snapshot timestamp; gap='+focusStampGap);
   await evaluate("FreeMyTV.move(0,1)");

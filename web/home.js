@@ -160,7 +160,7 @@
   var Z = {ACTIONS:'actions', REPORT:'report', DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
   var st = {action:0, zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
-  var artworkActions = null, previewItem = null, keyArtworkTimer = 0, keyArtworkPending = false, keyArtworkLong = false, artworkLongTimer = 0;
+  var artworkActions = null, previewItem = null, previewSource = '', keyArtworkTimer = 0, keyArtworkPending = false, keyArtworkLong = false, artworkLongTimer = 0;
   var featurePreview = HomeHero.create($('feature-preview'));
   var dashboardScroll = null, dashboardStack = null, dashboardScrollTab = -1;
   var pressedArtwork = null;
@@ -225,6 +225,7 @@
 
   function updateFocus() {
     var i, list;
+    setClass(body, 'dock-focused', st.zone === Z.SHELF);
     list = $('tabs').children;
     for (i = 0; i < list.length; i++) {
       setClass(list[i], 'on', i === st.tab);
@@ -405,17 +406,19 @@
     }
     if (holder.firstChild.textContent !== item.title) holder.firstChild.textContent = item.title;
     var meta = parts.join(' · ');
-    setClass(holder, 'long-details', item.title.length > 180 || meta.length > 200);
+    setClass(holder, 'long-details', item.title.length > 120 || meta.length > 100);
     if (holder.lastChild.textContent !== meta) holder.lastChild.textContent = meta;
   }
 
   function renderFeaturePreview() {
-    var enabled = dashboardOn && ((st.tab === 0 && videoItems.length > 0) || (st.tab === 2 && mediaItems.length > 0));
+    var enabled = dashboardOn && ((st.tab === 0 && (videoItems.length > 0 || mediaItems.length > 0)) || (st.tab === 2 && mediaItems.length > 0));
     setClass(body, 'preview-layout', enabled);
     if (!enabled || document.hidden || saverOn || sheetOpen() || st.zone === Z.DRAWER) {previewItem = null;featurePreview.update(null);return;}
     var selected = focusedArtwork(), item = selected && selected.item;
     if (!item && (st.zone === Z.TOP || st.zone === Z.SHELF)) {
-      var list = st.tab === 0 ? YouTubeFeed.items(HomeProfile.config) : MediaCards.items(HomeProfile.config);
+      previewSource = st.tab === 0 ? 'youtube' : 'media';
+      var list = arrangedItems(previewSource);
+      if (!list.length && st.tab === 0) {previewSource = 'media';list = arrangedItems(previewSource);}
       item = list[0];
     }
     previewItem = item || null;
@@ -434,7 +437,7 @@
 
   function openArtworkActions(requestedSource, requestedId) {
     if (!dashboardOn || document.hidden || saverOn || sheetOpen()) return;
-    var source = focusedArtwork(), kind = source ? source.source : st.tab === 0 ? 'youtube' : st.tab === 2 ? 'media' : '';
+    var source = focusedArtwork(), kind = source ? source.source : previewSource;
     var item = source ? source.item : previewItem;
     if (typeof requestedSource === 'string' && requestedId) {
       kind = requestedSource;var requested = arrangedItems(kind);item = null;
@@ -769,7 +772,7 @@
 
   function dockFace(app, box) {
     var input = /^com\.webos\.app\.hdmi[1-4]$/.test(app.id);
-    var labels = {'com.cobalt.youtube.adfree': 'YouTube', 'space.nuvio.webos': 'Nuvio', 'com.webos.app.hdmi2': 'Receiver', 'com.webos.app.hdmi3': 'PS5'};
+    var labels = {'youtube.leanback.v4':'YouTube', 'com.cobalt.youtube.adfree': 'YouTube', 'space.nuvio.webos': 'Nuvio', 'com.webos.app.hdmi2': 'Receiver', 'com.webos.app.hdmi3': 'PS5'};
     var symbol = input ? 'hdmi' : 'apps';
     if (app.id === 'com.webos.app.hdmi2') symbol = 'speaker';
     if (app.id === 'com.webos.app.hdmi3') symbol = 'gamepad';

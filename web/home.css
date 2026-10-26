@@ -761,3 +761,17 @@ body.dashboard-home.night, .dashboard-home.night #sky { background: #000; }
 #artwork-actions .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .context-detail { font-size: 22px; line-height: 28px; color: #ccc; max-height: 112px; overflow: hidden; margin-top: 12px; }
+
+/* Artwork details share the contextual header, leaving app and input locations stable. */
+.dashboard-home.focus-details-on #platter, .dashboard-home.focus-details-on #tiles { visibility: visible; }
+.dashboard-home #focus-details { left: 112px; right: 480px; top: 166px; bottom: auto; max-height: 180px; padding: 0; border: 0; border-radius: 0; background: transparent; pointer-events: none; }
+.dashboard-home #focus-details .focus-title { font-size: 32px; line-height: 38px; }
+.dashboard-home #focus-details .focus-meta { font-size: 20px; line-height: 26px; }
+.dashboard-home #focus-details.long-details .focus-title { font-size: 18px; line-height: 22px; }
+.dashboard-home #focus-details.long-details .focus-meta { font-size: 14px; line-height: 18px; }
+.preview-layout.focus-details-on #feature-preview .hero-title, .preview-layout.focus-details-on #feature-preview .hero-meta { visibility: hidden; }
+.dashboard-home #tiles { opacity: 0.78; -webkit-transition: opacity 0.16s; transition: opacity 0.16s; }
+.dashboard-home.dock-focused #tiles { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .dashboard-home #tiles { -webkit-transition: none; transition: none; } }
+
+.dashboard-home #feature-preview { height: 204px; }
