@@ -50,6 +50,8 @@ var Prefs = (function () {
     weather: function () { return pick('weather', true); },
     quotes: function () { return pick('quotes', CONFIG.showCrypto !== false); },
     coin: function (i) { var c = pick('coins', null); return c ? c[i] !== false : true; },
+    arrangement: function (source) { return pick('arrangement-' + source, null); },
+    profileShelf: function () { return pick('profileShelf', null); },
     shelf: function () { return pick('shelf', null); },
     set: function (name, value) { v[name] = value; save(); this.version++; },
     setCoin: function (i, on) {
