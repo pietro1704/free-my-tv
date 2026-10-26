@@ -17,9 +17,13 @@ var YouTubeFeed = (function () {
     out.sort(function (a,b) {return a.rank - b.rank || a.order - b.order;});
     return out.slice(0,24);
   }
-  function target(config, index) {
+  function target(config, index, selectedId) {
     var list = items(config);
-    return typeof index === 'number' && index >= 0 && index % 1 === 0 && index < list.length ? {id:config.youtubeApp,params:{contentTarget:'https://www.youtube.com/watch?v='+list[index].id}} : null;
+    if (typeof index !== 'number' || index < 0 || index % 1 !== 0 || index >= list.length) return null;
+    if (selectedId !== undefined && selectedId !== list[index].id) return null;
+    // Cobalt's documented deep link stays on the TV surface, not the desktop watch page.
+    var prefix = config.youtubeApp === 'com.cobalt.youtube.adfree' ? 'v=' : 'https://www.youtube.com/watch?v=';
+    return {id:config.youtubeApp,params:{contentTarget:prefix+list[index].id}};
   }
   return {items:items,target:target};
 })();
