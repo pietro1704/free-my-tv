@@ -81,6 +81,11 @@ try {
     assert.equal(await evaluate("document.querySelectorAll('#home-widgets button').length"),2);
     await evaluate("FreeMyTV.state.zone='top';FreeMyTV.state.top=5;FreeMyTV.activate()");
     assert.equal(await evaluate("FreeMyTV.state.zone==='settings'"),true);
+    for (const event of ['webOSRelaunch','appcontrol']) {
+      await evaluate("FreeMyTV.state.tab=2;FreeMyTV.state.shelf=1;"+(event==='webOSRelaunch'?'document':'window')+".dispatchEvent(new Event('"+event+"'))");
+      await wait(60);
+      assert.deepEqual(await evaluate('({tab:FreeMyTV.state.tab,zone:FreeMyTV.state.zone,shelf:FreeMyTV.state.shelf})'),{tab:0,zone:'shelf',shelf:0},'Legacy relaunch must retain its first-tab and first-app behavior');
+    }
     assert.deepEqual(errors,[]);
     console.log('PASS: legacy three-tab home, two widgets, diagnostics and chosen app discovery');
   } else {
@@ -369,6 +374,64 @@ try {
   assert.equal(identityVideo.cards,0,'Loss of account confirmation removes stale video cards');
   const staleVideo=await evaluate(`(function(){var feed=CONFIG.homeProfile.youtubeFeed,at=feed.observedAt;try{feed.observedAt='1999-01-01';document.querySelectorAll('#tabs .tab')[0].click();return document.querySelectorAll('.video-card').length}finally{feed.observedAt=at;document.querySelectorAll('#tabs .tab')[0].click()}})()`);
   assert.equal(staleVideo,0,'Expired snapshots cannot retain subscription artwork');
+  async function returnDashboard(event, whileHidden='') {
+    await evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))");
+    try {
+      if (whileHidden) await evaluate(whileHidden);
+      if (event) await evaluate((event==='webOSRelaunch'?'document':'window')+".dispatchEvent(new Event('"+event+"'))");
+    } finally {
+      await evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'))");
+      await wait(60);
+      await evaluate('delete document.hidden');
+    }
+  }
+  for (const relaunchEvent of ['webOSRelaunch','appcontrol']) {
+    await evaluate(`(async function(){
+      document.querySelectorAll('#tabs .tab')[2].click();
+      FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.media=1;FreeMyTV.move(0,0);
+      FreeMyTV.activate();await new Promise(function(resolve){setTimeout(resolve,30)});
+    })()`);
+    const launches=await evaluate('window.__launches.length');
+    await returnDashboard(relaunchEvent);
+    assert.deepEqual(await evaluate("({tab:FreeMyTV.state.tab,zone:FreeMyTV.state.zone,title:document.querySelector('.media-card.selected .media-name')&&document.querySelector('.media-card.selected .media-name').textContent,launches:window.__launches.length})"),{tab:2,zone:'dashboard',title:'Fixture title 1',launches},relaunchEvent+' must return to the selected Nuvio artwork without launching again');
+
+    await evaluate("document.querySelectorAll('#tabs .tab')[0].click();FreeMyTV.state.zone='widgets';FreeMyTV.state.widget=2;FreeMyTV.move(0,0)");
+    const scroll=await evaluate("document.getElementById('dashboard-scroll').scrollTop");
+    assert.ok(scroll>0,'Return regression must start from scrolled content');
+    await returnDashboard(relaunchEvent);
+    assert.deepEqual(await evaluate("({zone:FreeMyTV.state.zone,widget:FreeMyTV.state.widget,scroll:document.getElementById('dashboard-scroll').scrollTop})"),{zone:'widgets',widget:2,scroll},'Relaunch must retain the focused widget and vertical position');
+  }
+  await evaluate("document.querySelectorAll('#tabs .tab')[1].click();document.querySelectorAll('#tabs .tab')[0].click();FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.video=1;FreeMyTV.move(0,0);window.__feedRows=CONFIG.homeProfile.youtubeFeed.items");
+  const resumedId=await evaluate('YouTubeFeed.items(HomeProfile.config)[1].id');
+  await returnDashboard('webOSRelaunch',"CONFIG.homeProfile.youtubeFeed.items=window.__feedRows.map(function(row,i){var copy={};Object.keys(row).forEach(function(key){copy[key]=row[key]});copy.rank=i===1?-1:i;return copy})");
+  assert.deepEqual(await evaluate('({zone:FreeMyTV.state.zone,video:FreeMyTV.state.video,id:YouTubeFeed.items(HomeProfile.config)[FreeMyTV.state.video].id})'),{zone:'dashboard',video:0,id:resumedId},'Reordered subscriptions must restore the same video identity rather than its former index');
+  await evaluate('FreeMyTV.activate()');
+  assert.deepEqual(await evaluate('window.__launchParams[window.__launchParams.length-1]'),{contentTarget:'v='+resumedId},'OK after returning must still open the restored video');
+  const beforeWithdrawal=await evaluate('window.__launches.length');
+  await returnDashboard('webOSRelaunch','CONFIG.homeProfile.youtubeFeed.accountConfirmed=false');
+  assert.deepEqual(await evaluate("({cards:document.querySelectorAll('.video-card').length,details:document.getElementById('focus-details').textContent,launches:window.__launches.length})"),{cards:0,details:'',launches:beforeWithdrawal},'Returning after account withdrawal must remove artwork without replaying the previous target');
+  await evaluate('CONFIG.homeProfile.youtubeFeed.items=window.__feedRows;CONFIG.homeProfile.youtubeFeed.accountConfirmed=true;delete window.__feedRows;Data.settingsChanged()');
+  await returnDashboard(null);
+  assert.equal(await evaluate("FreeMyTV.state.zone==='dashboard'&&document.querySelector('.video-card.selected')!==null"),true,'A visibility-only return must also restore usable artwork');
+
+  await evaluate("document.querySelectorAll('#tabs .tab')[1].click();FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.state.news=1;FreeMyTV.move(0,0);FreeMyTV.activate()");
+  await returnDashboard('webOSRelaunch');
+  assert.deepEqual(await evaluate("({tab:FreeMyTV.state.tab,zone:FreeMyTV.state.zone,news:FreeMyTV.state.news,report:document.getElementById('news-report').textContent})"),{tab:1,zone:'dashboard',news:1,report:''},'Backgrounding a report must clear it and return to the same news selection');
+  await evaluate("document.querySelectorAll('#tabs .tab')[0].click();FreeMyTV.state.zone='widgets';FreeMyTV.state.widget=2;FreeMyTV.activate()");
+  await returnDashboard('webOSRelaunch');
+  assert.deepEqual(await evaluate("({zone:FreeMyTV.state.zone,widget:FreeMyTV.state.widget,closed:document.getElementById('settings').className.indexOf('open')<0})"),{zone:'widgets',widget:2,closed:true},'Backgrounding the agenda must return to its widget without reopening stale events');
+  await evaluate("FreeMyTV.state.zone='dashboard';FreeMyTV.state.dashboard=0;FreeMyTV.move(0,0)");
+
+  const hiddenSaver=await evaluate(`(function(){var before=window.__launches.length;
+    try{Object.defineProperty(document,'hidden',{configurable:true,value:true});FreeMyTV.showSaver();return window.__launches.length-before}
+    finally{delete document.hidden}
+  })()`);
+  assert.equal(hiddenSaver,0,'Idle protection must not launch over an app playing in the foreground');
+  const firstWake=await evaluate(`(function(){var native=CONFIG.homeProfile.nativeScreensaver,before=window.__launches.length;
+    try{CONFIG.homeProfile.nativeScreensaver=false;FreeMyTV.showSaver();document.dispatchEvent(new KeyboardEvent('keydown',{keyCode:TV.keys.ok,bubbles:true,cancelable:true}));return {hidden:document.getElementById('saver').className.indexOf('on')<0,launches:window.__launches.length-before}}
+    finally{CONFIG.homeProfile.nativeScreensaver=native;FreeMyTV.hideSaver()}
+  })()`);
+  assert.deepEqual(firstWake,{hidden:true,launches:0},'The first OK after idle must only wake the panel, not open the selected video');
   const cancellation=await evaluate(`(function(){
     var old=TV.launch,oldDismiss=TV.dismissScreensaver,pending=[],dismissed=0;
     try {
@@ -390,7 +453,7 @@ try {
   const overflow = await evaluate("Array.prototype.some.call(document.querySelectorAll('#dashboard .dashboard-subtitle'),function(x){return x.clientWidth>0 && (x.scrollWidth>x.clientWidth || x.getBoundingClientRect().right>x.parentNode.getBoundingClientRect().right)})");
   assert.equal(overflow,false,'Panel subtitles must wrap within their card');
   if(process.env.DASHBOARD_SCREENSHOT){await evaluate("Prefs.set('theme','dark');Data.settingsChanged();document.getElementById('toast').className=''");await wait(2300);const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.DASHBOARD_SCREENSHOT,Buffer.from(shot.data,'base64'));}
-  console.log(JSON.stringify({pass:true,tabs:4,compactHeader:true,unifiedControls:true,controlsBackFocus:true,removedActionGuard:true,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,youtubeCards:true,youtubeIdentityAndStaleGuard:true,frankNews:true,cachedNewsImages:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,personalCalendar:true,calendarStaleGuard:true,oledPolicyPreserved:true}));
+  console.log(JSON.stringify({pass:true,tabs:4,compactHeader:true,unifiedControls:true,controlsBackFocus:true,removedActionGuard:true,fixedApps:expected,geometry,navigation,exactLaunches:true,launchFailure:true,diagnostics:true,youtubeCards:true,youtubeIdentityAndStaleGuard:true,frankNews:true,cachedNewsImages:true,mediaCards:true,carouselNavigation:true,imageFailureFallback:true,personalCalendar:true,calendarStaleGuard:true,dashboardReturn:true,returnIdentity:true,returnScroll:true,oledPolicyPreserved:true}));
   }
 } finally {
   // Let Chrome flush and stop its helpers before deleting their profile, including on Linux CI.
