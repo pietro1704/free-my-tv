@@ -93,9 +93,10 @@ var Data = (function () {
   var weather = null, weatherAt = 0, fetchingWeather = false;
   (function () {
     var w = stored('weather');
-    if (w && w.place === PLACE) {
-      weather = parseWeather(w.body);
-      weatherAt = w.body.daily && w.body.daily.precipitation_probability_max ? w.at : 0;
+    var parsed = w && w.place === PLACE ? parseWeather(w.body) : null;
+    if (parsed) {
+      weather = parsed;
+      weatherAt = w.body.daily.precipitation_probability_max && typeof w.at === 'number' && isFinite(w.at) ? w.at : 0;
     }
   })();
 
@@ -107,17 +108,19 @@ var Data = (function () {
   }
 
   function parseWeather(o) {
-    if (!o || !o.current) return null;
+    function number(value) { return typeof value === 'number' && isFinite(value); }
+    if (!o || !o.current || !number(o.current.temperature_2m) || !number(o.current.weather_code) || !o.daily || !Array.isArray(o.daily.time) || !o.daily.time.length) return null;
+    var days = Forecast.days(o.daily);
     var off = o.utc_offset_seconds || 0, now = Date.now();
     var w = {
       temp: o.current.temperature_2m, code: o.current.weather_code, isDay: o.current.is_day !== 0,
-      max: o.daily.temperature_2m_max[0], min: o.daily.temperature_2m_min[0],
-      sunrise: localTime(o.daily.sunrise[0], off), sunset: localTime(o.daily.sunset[0], off), hours: [], days: Forecast.days(o.daily)
+      max: days[0].max, min: days[0].min,
+      sunrise: localTime(o.daily.sunrise && o.daily.sunrise[0], off), sunset: localTime(o.daily.sunset && o.daily.sunset[0], off), hours: [], days: days
     };
     var hr = o.hourly;
-    for (var i = 0; hr && i < hr.time.length && w.hours.length < 6; i++) {
+    for (var i = 0; hr && Array.isArray(hr.time) && i < hr.time.length && w.hours.length < 6; i++) {
       var at = localTime(hr.time[i], off);
-      if (at <= now) continue;
+      if (at <= now || !hr.temperature_2m || !number(hr.temperature_2m[i]) || !hr.weather_code || !number(hr.weather_code[i])) continue;
       w.hours.push({at: at, temp: hr.temperature_2m[i], code: hr.weather_code[i], day: !hr.is_day || hr.is_day[i] !== 0});
     }
     return w;
@@ -133,7 +136,9 @@ var Data = (function () {
     get(url, {}, function (err, body) {
       fetchingWeather = false;
       if (err) return;
-      weather = parseWeather(body);
+      var parsed = parseWeather(body);
+      if (!parsed) return;
+      weather = parsed;
       weatherAt = Date.now();
       store('weather', {place: PLACE, body: body, at: weatherAt});
       changed();
