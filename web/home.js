@@ -121,6 +121,12 @@
   function pickShelf() {
     if (HomeProfile.enabled) {
       shelf = HomeProfile.shelf(apps, inputs);
+      var chosenProfile = Prefs.profileShelf();
+      if (Object.prototype.toString.call(chosenProfile) === '[object Array]') {
+        var arranged = [];
+        for (var c = 0; c < chosenProfile.length; c++) for (var a = 0; a < shelf.length; a++) if (shelf[a].id === chosenProfile[c] && arranged.indexOf(shelf[a]) < 0) arranged.push(shelf[a]);
+        shelf = arranged;
+      }
       others = [];
       return;
     }
@@ -151,15 +157,17 @@
   var dashboardNodes = {}, mediaItems = [], mediaTrack = null, newsItems = [], videoItems = [], videoTrack = null;
   var mediaSnapshot = null, videoSnapshot = null, pointerX = null, pointerY = null;
   var newsTrack = null, newsReportState = null;
-  var Z = {REPORT:'report', DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
+  var Z = {ACTIONS:'actions', REPORT:'report', DASHBOARD: 'dashboard', TOP: 'top', WIDGETS: 'widgets', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang'};
+  var st = {action:0, zone: Z.SHELF, top: 0, tab: 0, card: 0, dashboard: 0, media: 0, news: 0, video: 0, widget: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0};
   var cards = [];
+  var artworkActions = null, previewItem = null, keyArtworkTimer = 0, keyArtworkPending = false, keyArtworkLong = false, artworkLongTimer = 0;
   var featurePreview = HomeHero.create($('feature-preview'));
   var dashboardScroll = null, dashboardStack = null, dashboardScrollTab = -1;
   var pressedArtwork = null;
   var artworkPress = false, artworkRefreshPending = false, artworkPressTimer = 0;
 
   function releaseArtworkPress() {
+    clearTimeout(artworkLongTimer);
     setClass(pressedArtwork, 'pressed', false); pressedArtwork = null;
     if (!artworkPress) return;
     artworkPress = false;
@@ -180,6 +188,7 @@
         artworkPress = true;
         clearTimeout(artworkPressTimer);
         artworkPressTimer = setTimeout(releaseArtworkPress, 5000);
+        artworkLongTimer = setTimeout(function(){releaseArtworkPress();openArtworkActions(node.getAttribute('data-source'),node.getAttribute('data-item-id'));},650);
         return;
       }
       node = node.parentNode;
@@ -212,7 +221,7 @@
     else if (rect.top < viewport.top) dashboardScroll.scrollTop -= Math.ceil((viewport.top - rect.top) / scale) + 8;
   }
 
-  function sheetOpen() { return st.zone === Z.REPORT || st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
+  function sheetOpen() { return st.zone === Z.ACTIONS || st.zone === Z.REPORT || st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG; }
 
   function updateFocus() {
     var i, list;
@@ -243,6 +252,7 @@
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.APPS && st.grid === i);
     var rows = Math.max(1, Math.ceil(others.length / 5)), r = Math.floor(st.grid / 5), first = Math.max(0, Math.min(rows - 3, r - 1));
     $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * 239) + 'px)';
+    focusRows($('artwork-actions'), st.action, st.zone === Z.ACTIONS);
     focusRows($('settings'), st.row, st.zone === Z.SETTINGS);
     focusRows($('shelfedit'), st.edit, st.zone === Z.EDIT);
     focusRows($('langpick'), st.lang, st.zone === Z.LANG);
@@ -343,6 +353,15 @@
     updateFocus();
   }
 
+  function sourceItems(source) {return source === 'youtube' ? YouTubeFeed.items(HomeProfile.config) : MediaCards.items(HomeProfile.config);}
+  function arrangedItems(source) {return HomeArrangement.items(HomeProfile.config, source, sourceItems(source), Prefs.arrangement(source));}
+  function arrangedVideoTarget(id) {
+    var fresh = arrangedItems('youtube'), raw = sourceItems('youtube');
+    if (!fresh[st.video] || fresh[st.video].id !== id) return null;
+    for (var i = 0; i < raw.length; i++) if (raw[i].id === id) return YouTubeFeed.target(HomeProfile.config, i, id);
+    return null;
+  }
+
   function artworkSnapshot(feed) {
     return feed && Object.prototype.toString.call(feed.items) === '[object Array]' ? {feed:feed,rows:feed.items,count:feed.items.length,observedAt:feed.observedAt} : null;
   }
@@ -393,13 +412,58 @@
   function renderFeaturePreview() {
     var enabled = dashboardOn && ((st.tab === 0 && videoItems.length > 0) || (st.tab === 2 && mediaItems.length > 0));
     setClass(body, 'preview-layout', enabled);
-    if (!enabled || document.hidden || saverOn || sheetOpen() || st.zone === Z.DRAWER) {featurePreview.update(null);return;}
+    if (!enabled || document.hidden || saverOn || sheetOpen() || st.zone === Z.DRAWER) {previewItem = null;featurePreview.update(null);return;}
     var selected = focusedArtwork(), item = selected && selected.item;
     if (!item && (st.zone === Z.TOP || st.zone === Z.SHELF)) {
       var list = st.tab === 0 ? YouTubeFeed.items(HomeProfile.config) : MediaCards.items(HomeProfile.config);
       item = list[0];
     }
+    previewItem = item || null;
     featurePreview.update(item ? {id:item.id,title:item.title,meta:item.channel || item.episodeTitle || '',image:item.background || item.image} : null);
+  }
+
+  function closeArtworkActions() {
+    if (!artworkActions) return;
+    var previous = artworkActions; artworkActions = null;
+    setClass($('artwork-actions'), 'open', false);
+    st.zone = Z.DASHBOARD; st.dashboard = Math.max(0, dashboardItems().indexOf(previous.source));
+    var list = previous.source === 'youtube' ? videoItems : mediaItems;
+    for (var i = 0; i < list.length; i++) if (list[i].id === previous.id) st[previous.source === 'youtube' ? 'video' : 'media'] = i;
+    updateFocus();
+  }
+
+  function openArtworkActions(requestedSource, requestedId) {
+    if (!dashboardOn || document.hidden || saverOn || sheetOpen()) return;
+    var source = focusedArtwork(), kind = source ? source.source : st.tab === 0 ? 'youtube' : st.tab === 2 ? 'media' : '';
+    var item = source ? source.item : previewItem;
+    if (typeof requestedSource === 'string' && requestedId) {
+      kind = requestedSource;var requested = arrangedItems(kind);item = null;
+      for(var r = 0;r < requested.length;r++) if(requested[r].id === requestedId)item=requested[r];
+    }
+    if (!kind || !item) return;
+    var rows = arrangedItems(kind), valid = false;
+    for (var i = 0; i < rows.length; i++) if (rows[i].id === item.id) valid = true;
+    if (!valid) return;
+    artworkActions = {source:kind,id:item.id,scope:HomeArrangement.scope(HomeProfile.config,kind)};
+    var holder = $('artwork-actions').firstChild; holder.textContent = '';
+    el('div', 'title', holder, item.title);
+    var list = el('div', 'list', holder), inner = el('div','rows',list); list.style.height = '468px';
+    var detail = el('div','context-detail',holder);
+    detail.style.display = 'none';
+    var choices = [[tr('Details'),'details'],[tr('Pin to front'),'pin'],[tr('Move left'),'left'],[tr('Move right'),'right'],[tr('Hide'),'hide'],[tr('Restore cards'),'reset']];
+    for (var c = 0; c < choices.length; c++) (function (choice, index) {
+      var button = el('button','row',inner,choice[0]);
+      button.onmousemove = function (event) {if (pointerMoved(event)) {st.action = index;updateFocus();}};
+      button.onclick = function () {
+        var current = artworkActions;
+        if (!current || current.scope !== HomeArrangement.scope(HomeProfile.config,current.source) || !sourceItems(current.source).some(function(row){return row.id===current.id;})) {closeArtworkActions();renderDashboard();return;}
+        if (choice[1] === 'details') {detail.textContent = item.title + ' · ' + (item.channel || item.episodeTitle || '') + (item.season !== undefined ? ' · T'+item.season+' E'+item.episode : '') + (item.progress !== null && item.progress !== undefined ? ' · '+item.progress+'%' : '');detail.style.display='block';return;}
+        var change = HomeArrangement.change(HomeProfile.config,current.source,sourceItems(current.source),Prefs.arrangement(current.source),choice[1],current.id);
+        if (change) Prefs.set('arrangement-'+current.source,change);
+        renderDashboard();closeArtworkActions();
+      };
+    })(choices[c],c);
+    st.zone = Z.ACTIONS;st.action = 0;setClass($('artwork-actions'),'open',true);updateFocus();
   }
 
   function pointerMoved(event) {
@@ -435,7 +499,7 @@
     var stamp = panel.querySelector('.media-stamp');
     if (stamp) panel.removeChild(stamp);
     var previous = mediaItems[st.media];
-    mediaTrack = null; mediaItems = MediaCards.items(HomeProfile.config);
+    mediaTrack = null; mediaItems = arrangedItems('media');
     st.media = retainedArtworkIndex(mediaItems, previous, st.media);
     var feed = HomeProfile.config.mediaFeed;
     mediaSnapshot = artworkSnapshot(feed);
@@ -446,7 +510,7 @@
     mediaTrack = el('div', 'media-track', viewport);
     for (var i = 0; i < mediaItems.length; i++) {
       var item = mediaItems[i], card = el('div', 'media-card', mediaTrack);
-      artworkHover(card, 'media', i);
+      artworkHover(card, 'media', i);card.setAttribute('data-source','media');card.setAttribute('data-item-id',item.id);
       card.style.left = (i * (st.tab === 2 ? 184 : 270)) + 'px';
       var artwork = el('div', 'media-art', card), source = st.tab === 2 ? item.image || item.background : item.background || item.image;
       setClass(artwork, 'poster-fallback', st.tab !== 2 && !item.background);
@@ -493,7 +557,7 @@
     var stamp = panel.querySelector('.video-stamp');
     if (stamp) panel.removeChild(stamp);
     var previous = videoItems[st.video];
-    videoTrack = null; videoItems = YouTubeFeed.items(HomeProfile.config);
+    videoTrack = null; videoItems = arrangedItems('youtube');
     st.video = retainedArtworkIndex(videoItems, previous, st.video);
     var feed = HomeProfile.config.youtubeFeed;
     videoSnapshot = artworkSnapshot(feed);
@@ -507,7 +571,7 @@
     videoTrack = el('div', 'video-track', viewport);
     for (var i = 0; i < videoItems.length; i++) {
       var item = videoItems[i], card = el('div', 'video-card', videoTrack);
-      artworkHover(card, 'youtube', i);
+      artworkHover(card, 'youtube', i);card.setAttribute('data-source','youtube');card.setAttribute('data-item-id',item.id);
       card.style.left = (i * 372) + 'px';
       var artwork = el('div', 'video-art', card);
       if (item.image) {
@@ -606,6 +670,7 @@
 
   function renderDashboard() {
     if (artworkPress) {artworkRefreshPending = true; return;}
+    if (artworkActions && (artworkActions.scope !== HomeArrangement.scope(HomeProfile.config,artworkActions.source) || !sourceItems(artworkActions.source).some(function(row){return row.id===artworkActions.id;}))) closeArtworkActions();
     var holder = $('dashboard'), labels = HomeProfile.labels;
     if (!dashboardNodes.youtube) {
       var sources = ['youtube', 'media', 'news'];
@@ -1073,6 +1138,7 @@
         closeSheets(); st.zone = Z.SHELF; openDrawer(); st.drawer = 0; updateFocus();
       }}, {label: HomeProfile.labels.diagnostics || 'CPU / RAM / Hz', value: '›', step: openDiagnostics});
     }
+    if (dashboardOn) rows.push({label:tr('Restore cards'),value:'›',step:function(){Prefs.set('arrangement-youtube',null);Prefs.set('arrangement-media',null);renderDashboard();}});
     var names = ['Bitcoin', 'Ethereum', 'Solana', tr('Dollar'), 'Euro'];
     var count = HomeProfile.config.forex ? 5 : Data.currency === 'BRL' ? 4 : 3;
     for (var i = 0; i < count; i++) {
@@ -1082,7 +1148,7 @@
           step: function () { if (Prefs.quotes()) { Prefs.setCoin(i, !Prefs.coin(i)); Data.settingsChanged(); } }});
       })(i);
     }
-    if (!HomeProfile.enabled) rows.push({label: tr('Shelf'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
+    rows.push({shelf:true,label: tr('Shelf'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('TV Settings'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
     if (HomeProfile.enabled) {
       if (!dashboardOn) rows.push({label: HomeProfile.labels.diagnostics || 'CPU / RAM / Hz', value: '›',
@@ -1195,7 +1261,7 @@
 
   function editList() {
     var ids = shelf.map(function (a) { return a.id; });
-    return {ids: ids, rows: apps.slice().sort(function (a, b) {
+    return {ids: ids, rows: (HomeProfile.enabled ? HomeProfile.shelf(apps, inputs) : apps.slice()).sort(function (a, b) {
       var ia = ids.indexOf(a.id), ib = ids.indexOf(b.id);
       if (ia >= 0 || ib >= 0) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
       return a.title.toLowerCase() < b.title.toLowerCase() ? -1 : 1;
@@ -1242,7 +1308,7 @@
       ids.splice(at, 1);
       ids.splice(to, 0, app.id);
     }
-    Prefs.set('shelf', ids);
+    Prefs.set(HomeProfile.enabled ? 'profileShelf' : 'shelf', ids);
     pickShelf();
     renderShelf();
     var again = editList();
@@ -1273,6 +1339,8 @@
 
   function activate() {
     switch (st.zone) {
+      case Z.ACTIONS:
+        var actionButtons = $('artwork-actions').querySelectorAll('.row');if (actionButtons[st.action]) actionButtons[st.action].click();return;
       case Z.TOP:
         if (st.top < tabCount()) return;
         if (st.top >= tabCount() + topButtonCount()) return;
@@ -1288,7 +1356,7 @@
         var source = dashboardItems()[st.dashboard], target = HomeDashboard.app(HomeProfile.config, source);
         var focused = focusedArtwork();
         if (((source === 'youtube' && videoItems.length) || (source === 'media' && mediaItems.length)) && !focused) {renderDashboard();return;}
-        var videoTarget = source === 'youtube' && videoItems.length ? YouTubeFeed.target(HomeProfile.config, st.video, focused.item.id) : null;
+        var videoTarget = source === 'youtube' && videoItems.length ? arrangedVideoTarget(focused.item.id) : null;
         if (videoTarget) TV.launch(videoTarget.id, videoTarget.params, function (ok) {if (!ok) toast(trf("Couldn't open {app}.", {app: 'YouTube'}));});
         else if (source === 'youtube' && videoItems.length) {renderVideos();updateFocus();toast(HomeProfile.labels.youtubeRefresh || 'Inscrições aguardando atualização');}
         else if (target) launcher(target.id, target.title)();
@@ -1340,6 +1408,8 @@
   function move(dx, dy) {
     var tiles = $('tiles').children, cardNodes = $('cards').children;
     switch (st.zone) {
+      case Z.ACTIONS:
+        st.action = Math.max(0,Math.min(5,st.action + dy));break;
       case Z.SHELF:
         if (dx) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dx));
         else if (dy > 0) { openDrawer(); return; }
@@ -1418,10 +1488,11 @@
   }
 
   function back() {
+    if (st.zone === Z.ACTIONS) {closeArtworkActions();return;}
     if(st.zone===Z.REPORT){closeNewsReport();return;}
     if (calendarOn) {closeSheets();st.zone = Z.WIDGETS;st.widget = 2;updateFocus();return;}
     if (diagnosticsOn || homelabOn) { openSettings(); return; }
-    if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
+    if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings();for(var editRow=0;editRow<rowsNow.length;editRow++)if(rowsNow[editRow].shelf)st.row=editRow;updateFocus();return; }
     if (st.zone === Z.LANG) { closeLanguages(false); return; }
     if (sheetOpen()) { closeSheets(); return; }
     if (st.zone === Z.DRAWER) { closeDrawer(); return; }
@@ -1545,21 +1616,33 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    if(k!==TV.keys.ok)cancelArtworkKey();
     releaseArtworkPress();
     if (poke()) { e.preventDefault(); return; }   // the first press only wakes the screen
+    if (dashboardOn && (k === 457 || k === 93)) {openArtworkActions();e.preventDefault();return;}
     if (k === TV.keys.left) move(-1, 0);
     else if (k === TV.keys.right) move(1, 0);
     else if (k === TV.keys.up) move(0, -1);
     else if (k === TV.keys.down) move(0, 1);
     else if (k === TV.keys.ok) {
-      if (dashboardOn && st.zone === Z.DASHBOARD) {pressedArtwork = document.querySelector('.video-card.selected, .media-card.selected, .news-card.selected');setClass(pressedArtwork, 'pressed', true);}
-      activate();
+      if (dashboardOn && focusedArtwork()) {
+        if (e.repeat || keyArtworkPending) {e.preventDefault();return;}
+        pressedArtwork = document.querySelector('.video-card.selected, .media-card.selected');setClass(pressedArtwork, 'pressed', true);
+        keyArtworkPending = true;keyArtworkLong = false;
+        keyArtworkTimer = setTimeout(function(){if(keyArtworkPending){keyArtworkLong=true;releaseArtworkPress();openArtworkActions();}},650);
+      } else activate();
     }
     else if (k === TV.keys.back || k === 27 || k === 8) back();
     else return;
     e.preventDefault();
   });
-  document.addEventListener('keyup', function (event) {if (event.keyCode === TV.keys.ok) releaseArtworkPress();});
+  document.addEventListener('keyup', function (event) {
+    if(event.keyCode!==TV.keys.ok)return;
+    releaseArtworkPress();clearTimeout(keyArtworkTimer);
+    if(keyArtworkPending){keyArtworkPending=false;if(!keyArtworkLong)activate();event.preventDefault();}
+  });
+  function cancelArtworkKey(){clearTimeout(keyArtworkTimer);keyArtworkPending=false;releaseArtworkPress();}
+  window.addEventListener('blur',cancelArtworkKey);
   document.addEventListener('mousemove', function (event) { pointerX = event.clientX; pointerY = event.clientY; poke(); });
   document.addEventListener('mousedown', beginArtworkPress, true);
   document.addEventListener('mouseup', releaseArtworkPress, true);
@@ -1627,6 +1710,7 @@
   });
 
   function reopened() {
+    closeArtworkActions();
     // LG: with handlesRelaunch the app has to come to the front itself, or opening it again while it runs shows nothing.
     if (window.PalmSystem && window.PalmSystem.activate) window.PalmSystem.activate();
     reset();
@@ -1639,6 +1723,8 @@
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
+      cancelArtworkKey();
+      closeArtworkActions();
       featurePreview.update(null);
       releaseArtworkPress();
       hideSaver();
@@ -1656,6 +1742,9 @@
     loadApps(function () { renderShelf(); renderDrawer(); renderCards(); updateFocus(); Data.refresh(); });
   });
 
+  $('artwork-menu').onclick = openArtworkActions;
+  $('artwork-menu').setAttribute('aria-label',tr('Details'));
+  document.addEventListener('contextmenu',function(event){if(dashboardOn && focusedArtwork()){event.preventDefault();openArtworkActions();}});
   I18N.set(Prefs.language());
   initDashboardScroll();
   initHomeWidgets();

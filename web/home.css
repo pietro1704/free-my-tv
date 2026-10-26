@@ -754,3 +754,10 @@ body.dashboard-home.night, .dashboard-home.night #sky { background: #000; }
 .cinema-layout #dashboard[data-view="youtube"] .media-viewport { height: 248px; }
 .cinema-layout #dashboard[data-view="youtube"] .media-name { font-size: 20px; line-height: 24px; height: 48px; }
 .cinema-layout .video-stamp, .cinema-layout .media-stamp { display: none; }
+
+#artwork-menu { pointer-events: auto; position: absolute; right: 24px; bottom: 20px; width: 68px; height: 52px; border-radius: 26px; background: #303034; color: #eee; font-size: 26px; }
+#artwork-menu:hover, #artwork-menu:focus { background: #555; }
+#artwork-actions .row { display: block; width: 100%; text-align: left; }
+#artwork-actions .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.context-detail { font-size: 22px; line-height: 28px; color: #ccc; max-height: 112px; overflow: hidden; margin-top: 12px; }
