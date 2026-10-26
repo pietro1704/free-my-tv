@@ -161,6 +161,8 @@ try {
   assert.deepEqual(longWidget,{plain:true,contained:true,bounded:true,clipped:true,tomorrow:true},'Long calendar titles must stay bounded and available in the full agenda');
   const expiredWidget=await evaluate(`(function(){var feed=CONFIG.homeProfile.calendarFeed,original=feed.today;try{feed.today='1999-01-01';Data.settingsChanged();var card=document.querySelector('[data-widget=calendar]');return {cleared:card.textContent.indexOf('Agenda fixture')<0,rows:card.querySelectorAll('.widget-line').length,compact:card.getBoundingClientRect().height<=160}}finally{feed.today=original;Data.settingsChanged()}})()`);
   assert.deepEqual(expiredWidget,{cleared:true,rows:1,compact:true},'Expired calendar data must replace event rows with the bounded unavailable state');
+  // Keep the earlier pointer exercise outside panels that move when tabs change.
+  await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:10,y:10});
   for(let tab=0;tab<4;tab++) {
     await evaluate(`document.querySelectorAll('#tabs .tab')[${tab}].click();FreeMyTV.state.zone='widgets';FreeMyTV.state.widget=0;FreeMyTV.move(-1,0)`);
     for(let index=0;index<4;index++) {
