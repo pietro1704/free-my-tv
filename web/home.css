@@ -715,3 +715,18 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .dashboard-home .news-image { top: 16px; width: 192px; height: 108px; }
 .dashboard-home .news-headline { left: 216px; top: 16px; }
 .dashboard-home .news-meta { left: 216px; bottom: 16px; }
+
+/* The private dashboard defaults to OLED black; an explicit light theme still wins. */
+body.dashboard-home.night, .dashboard-home.night #sky { background: #000; }
+.dashboard-home.night #sky .grad, .dashboard-home.night #sky canvas,
+.dashboard-home.night #sky .veil, .dashboard-home.night #sky .lift { display: none; }
+.dashboard-home.night .round { background: #121212; box-shadow: none; }
+.dashboard-home.night .tab.focus, .dashboard-home.night .round.focus,
+.dashboard-home.night .key.focus { background: #242426; color: #ddd; box-shadow: inset 0 0 0 1px #aaa; }
+.dashboard-home .tab, .dashboard-home .round, .dashboard-home .key,
+.dashboard-home .tile { -webkit-transition: -webkit-transform 0.14s; transition: transform 0.14s; }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-home #home, .dashboard-home #drawer, .dashboard-home #top,
+  .dashboard-home .tab, .dashboard-home .round, .dashboard-home .key,
+  .dashboard-home .tile, .dashboard-home .box .rows { -webkit-transition: none; transition: none; }
+}
