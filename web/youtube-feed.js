@@ -22,7 +22,7 @@ var YouTubeFeed = (function () {
     if (typeof index !== 'number' || index < 0 || index % 1 !== 0 || index >= list.length) return null;
     if (selectedId !== undefined && selectedId !== list[index].id) return null;
     // Cobalt's documented deep link stays on the TV surface, not the desktop watch page.
-    var prefix = config.youtubeApp === 'com.cobalt.youtube.adfree' ? 'v=' : 'https://www.youtube.com/watch?v=';
+    var prefix = config.youtubeApp === 'com.cobalt.youtube.adfree' ? 'v=' : config.youtubeApp === 'youtube.leanback.v4' ? 'https://www.youtube.com/tv?v=' : 'https://www.youtube.com/watch?v=';
     return {id:config.youtubeApp,params:{contentTarget:prefix+list[index].id}};
   }
   return {items:items,target:target};
