@@ -24,6 +24,7 @@ if [ "$what" = all ] || [ "$what" = web ]; then
   node --test tests/weather-data.test.cjs
   node --test tests/homelab.test.cjs
   node --test tests/idle.test.cjs
+  node --test tests/oled-power-request.test.cjs
   node --test tests/provider-picks.test.cjs
   node --test tests/widgets.test.cjs
   node --test tests/news-feed.test.cjs

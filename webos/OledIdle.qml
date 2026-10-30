@@ -30,7 +30,7 @@ Item {
     property int idleElapsedMs: Idle.IdlePolicy.elapsedFromArgs(launchArguments, nativeElapsedMs)
     property int remainingMs: Idle.IdlePolicy.remaining(idleElapsedMs, idleBudgetMs)
     property var powerRequest: function() {
-        power.call("luna://com.webos.service.tvpower", "/power/powerOff", "{}")
+        power.call("luna://com.webos.service.tvpower", "/power/powerOff", '{"reason":"autoOff"}')
     }
     Service {
         id: power
